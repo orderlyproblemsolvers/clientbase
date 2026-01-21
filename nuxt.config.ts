@@ -2,6 +2,7 @@
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
+  ssr: true,
   modules: [
     '@nuxt/image',
     '@nuxt/ui',
@@ -12,5 +13,10 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
   supabase: {
     redirect: false
+  },
+  nitro: {
+    preset: 'netlify',
+    compressPublicAssets: true,
+    minify: true
   },
 })
