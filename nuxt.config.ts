@@ -38,6 +38,12 @@ export default defineNuxtConfig({
   supabase: {
     redirect: false
   },
+  runtimeConfig:{
+    public: {
+      CloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME,
+      CloudinaryPreset: process.env.CLOUDINARY_PRESET
+    }
+  },
   nitro: {
     preset: 'netlify',
     compressPublicAssets: true,

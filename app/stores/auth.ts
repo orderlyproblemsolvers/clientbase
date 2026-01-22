@@ -8,7 +8,6 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     async login(email: string, password: string) {
       const supabase = useSupabaseClient()
-      const user = useSupabaseUser() // <--- 1. Get the user composable
       
       this.loading = true
       
@@ -20,12 +19,14 @@ export const useAuthStore = defineStore('auth', {
 
         if (error) throw error
         
-        // <--- 2. THE FIX: Manually update the user state immediately
-        if (data.user) {
-            user.value = data.user
-        }
+        // IMPORTANT: Do NOT manually set user.value
+        // Let Supabase's reactive system handle it naturally
+        // This ensures all watchers trigger correctly
         
-        // 3. Now it is safe to redirect
+        // Wait a moment for Supabase to update its internal state
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Now it is safe to redirect
         return navigateTo('/')
         
       } catch (error: any) {
@@ -37,12 +38,18 @@ export const useAuthStore = defineStore('auth', {
 
     async logout() {
       const supabase = useSupabaseClient()
-      const user = useSupabaseUser()
       
+      // Get the profile reset function BEFORE logout
+      const { reset: resetProfile } = useUserProfile()
+      
+      // Reset profile immediately (this clears the old avatar)
+      resetProfile()
+      
+      // Now sign out
       await supabase.auth.signOut()
       
-      // Optional: Clear user state manually on logout too for instant UI updates
-      user.value = null
+      // Give it a moment for the auth system to update
+      await new Promise(resolve => setTimeout(resolve, 50))
       
       return navigateTo('/login')
     }

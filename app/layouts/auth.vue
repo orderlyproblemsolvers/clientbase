@@ -28,10 +28,8 @@
       <div class="flex-1 flex flex-col justify-center items-center px-8 py-12">
         
         <!-- Mobile Logo -->
-        <div class="lg:hidden w-full max-w-sm mb-8">
-          <h1 class="text-xl font-black italic uppercase text-primary tracking-tighter">
-            Client Base <span class="text-[10px] text-gray-500 not-italic ml-1">OPS</span>
-          </h1>
+        <div class="lg:hidden w-full max-w-sm mb-8 grid place-content-center">
+          <img src="/img/clientbaselogo-white.png" alt="Client Base OPS" class="h-16 w-auto object-contain" />
         </div>
 
         <!-- Main Content -->

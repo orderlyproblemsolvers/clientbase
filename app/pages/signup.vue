@@ -5,8 +5,13 @@ definePageMeta({
 
 const client = useSupabaseClient()
 const loading = ref(false)
-const step = ref(1) // 1 = Credentials, 2 = Profile
+const step = ref(1) // 1 = Credentials, 2 = Profile, 3 = Avatar
 const errorMsg = ref('')
+const config = useRuntimeConfig()
+
+// --- CONFIGURATION ---
+const CLOUDINARY_CLOUD_NAME = config.public.CloudinaryCloudName
+const CLOUDINARY_PRESET = config.public.CloudinaryPreset
 
 // --- Form State ---
 const form = ref({
@@ -16,8 +21,19 @@ const form = ref({
   fullName: '',
   role: 'Developer',
   phone: '',
-  organization: ''
+  organization: '',
+  avatar_url: null as string | null
 })
+
+// --- Avatar State ---
+const avatarPreview = ref<string | null>(null)
+const avatarUploading = ref(false)
+const avatarDefaultOptions = [
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=John',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=Jane',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=Taylor'
+]
 
 // --- Validation Logic ---
 const passwordValid = computed(() => {
@@ -38,7 +54,79 @@ const step2Valid = computed(() => {
          form.value.phone.length > 5
 })
 
-// --- Actions ---
+// --- Avatar Functions ---
+
+// Handle file upload to Cloudinary
+const handleAvatarUpload = async (file: File) => {
+  avatarUploading.value = true
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('upload_preset', CLOUDINARY_PRESET)
+
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+      method: 'POST',
+      body: formData
+    })
+
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error?.message || 'Upload failed')
+    
+    form.value.avatar_url = data.secure_url
+    avatarPreview.value = data.secure_url
+    return data.secure_url
+  } catch (error: any) {
+    console.error('Avatar upload failed:', error)
+    errorMsg.value = 'Failed to upload avatar. Please try another image or skip.'
+    throw error
+  } finally {
+    avatarUploading.value = false
+  }
+}
+
+// Handle file selection
+const handleFileSelect = async (e: any) => {
+  const file = e.target.files[0]
+  if (!file) return
+  
+  // Check file size (max 5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    errorMsg.value = 'File size must be less than 5MB'
+    return
+  }
+  
+  // Check file type
+  if (!file.type.startsWith('image/')) {
+    errorMsg.value = 'Please select an image file'
+    return
+  }
+  
+  // Show preview
+  avatarPreview.value = URL.createObjectURL(file)
+  
+  // Upload to Cloudinary
+  try {
+    await handleAvatarUpload(file)
+  } catch {
+    // Error already handled in handleAvatarUpload
+  }
+}
+
+// Select default avatar
+const selectDefaultAvatar = (url: string) => {
+  form.value.avatar_url = url
+  avatarPreview.value = url
+  errorMsg.value = '' // Clear any previous errors
+}
+
+// Skip avatar (use default from Supabase)
+const skipAvatar = () => {
+  form.value.avatar_url = null
+  avatarPreview.value = null
+  step.value = 4 // Go to final step
+}
+
+// --- Step Navigation ---
 
 const nextStep = () => {
   errorMsg.value = ''
@@ -49,17 +137,81 @@ const nextStep = () => {
   step.value = 2
 }
 
+const nextToAvatar = () => {
+  errorMsg.value = ''
+  if (!step2Valid.value) {
+    errorMsg.value = "Please complete all profile fields."
+    return
+  }
+  step.value = 3
+}
+
+const backToProfile = () => {
+  step.value = 2
+}
+
+// --- Signup Action ---
+
 const handleSignup = async () => {
   errorMsg.value = ''
   loading.value = true
 
   try {
-    // 1. Sign Up & Send Metadata
+    // 1. Sign Up with all metadata including avatar
     const { data, error } = await client.auth.signUp({
       email: form.value.email,
       password: form.value.password,
       options: {
-        // This data block is what the SQL Trigger reads
+        data: {
+          full_name: form.value.fullName,
+          role: form.value.role,
+          phone: form.value.phone,
+          organization: form.value.organization || 'Freelance',
+          avatar_url: form.value.avatar_url // Include avatar in signup metadata
+        }
+      }
+    })
+
+    if (error) throw error
+
+    // 2. If we have an avatar URL, also update the profile record directly
+    // (This ensures avatar is set even if the trigger doesn't pick it up)
+    if (form.value.avatar_url && data.user) {
+      try {
+        await client
+          .from('profiles')
+          .update({
+            avatar_url: form.value.avatar_url,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', data.user.id)
+      } catch (profileError) {
+        console.log('Note: Avatar not set in profiles table yet (trigger will handle it)', profileError)
+      }
+    }
+
+    // 3. Success Logic
+    alert("Account created! Please check your email to verify your account.")
+    navigateTo('/login')
+
+  } catch (e: any) {
+    console.error(e)
+    errorMsg.value = e.message || "Registration failed. Please try again."
+  } finally {
+    loading.value = false
+  }
+}
+
+// Quick signup without avatar
+const quickSignup = async () => {
+  errorMsg.value = ''
+  loading.value = true
+  
+  try {
+    const { error } = await client.auth.signUp({
+      email: form.value.email,
+      password: form.value.password,
+      options: {
         data: {
           full_name: form.value.fullName,
           role: form.value.role,
@@ -70,12 +222,8 @@ const handleSignup = async () => {
     })
 
     if (error) throw error
-
-    // 2. Success Logic
-    // Even if identity is null (due to enumeration protection), we assume success to guide user
     alert("Account created! Please check your email to verify your account.")
     navigateTo('/login')
-
   } catch (e: any) {
     console.error(e)
     errorMsg.value = e.message || "Registration failed. Please try again."
@@ -90,16 +238,27 @@ const handleSignup = async () => {
     
     <div class="text-center mb-8">
       <h1 class="text-3xl font-bold text-white mb-2 tracking-tight">Join Client Base</h1>
-      <p class="text-gray-400 text-sm">Step {{ step }} of 2: {{ step === 1 ? 'Account Security' : 'Your Profile' }}</p>
+      <p class="text-gray-400 text-sm">Step {{ step }} of {{ step === 4 ? '3' : '3' }}: {{ 
+        step === 1 ? 'Account Security' : 
+        step === 2 ? 'Your Profile' : 
+        'Avatar Setup' 
+      }}</p>
       
       <div class="flex gap-2 justify-center mt-4">
         <div class="h-1 w-8 rounded-full transition-colors" :class="step >= 1 ? 'bg-primary' : 'bg-white/10'"></div>
         <div class="h-1 w-8 rounded-full transition-colors" :class="step >= 2 ? 'bg-primary' : 'bg-white/10'"></div>
+        <div class="h-1 w-8 rounded-full transition-colors" :class="step >= 3 ? 'bg-primary' : 'bg-white/10'"></div>
       </div>
     </div>
 
-    <form @submit.prevent="step === 1 ? nextStep() : handleSignup()" class="space-y-5">
+    <form @submit.prevent="
+      step === 1 ? nextStep() : 
+      step === 2 ? nextToAvatar() : 
+      step === 3 ? handleSignup() : 
+      null
+    " class="space-y-5">
       
+      <!-- STEP 1: Credentials -->
       <div v-if="step === 1" class="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
         
         <div>
@@ -160,10 +319,11 @@ const handleSignup = async () => {
           :disabled="!step1Valid"
           class="w-full bg-primary hover:bg-[#3d34d9] text-white font-bold py-3 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
         >
-          Next Step &rarr;
+          Next: Profile Details &rarr;
         </button>
       </div>
 
+      <!-- STEP 2: Profile Details -->
       <div v-if="step === 2" class="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
         
         <div>
@@ -220,6 +380,83 @@ const handleSignup = async () => {
           <button 
             type="submit" 
             :disabled="loading || !step2Valid"
+            class="flex-[2] bg-primary hover:bg-[#3d34d9] text-white font-bold py-3 rounded-lg shadow-lg transition-all disabled:opacity-50"
+          >
+            Next: Choose Avatar &rarr;
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 3: Avatar Setup -->
+      <div v-if="step === 3" class="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
+        
+        <div class="text-center mb-4">
+          <p class="text-gray-400 text-sm mb-4">Choose a profile picture. You can upload your own or select a default.</p>
+          
+          <!-- Current Selection Preview -->
+          <div class="flex justify-center mb-6">
+            <div class="relative group">
+              <div class="w-24 h-24 rounded-full bg-primary flex items-center justify-center text-2xl font-bold text-white shadow-2xl overflow-hidden border-4 border-secondary">
+                <img v-if="avatarPreview" :src="avatarPreview" class="w-full h-full object-cover" />
+                <span v-else>{{ form.fullName.charAt(0).toUpperCase() }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Upload Option -->
+          <div class="mb-6">
+            <label class="block text-xs uppercase font-bold text-gray-500 mb-3 tracking-wider">Upload Your Photo</label>
+            <div class="relative border-2 border-dashed border-white/10 rounded-xl p-6 text-center hover:border-primary/50 transition-colors cursor-pointer">
+              <input 
+                type="file" 
+                @change="handleFileSelect" 
+                accept="image/*" 
+                class="absolute inset-0 opacity-0 cursor-pointer"
+                :disabled="avatarUploading"
+              />
+              <UIcon v-if="avatarUploading" name="i-heroicons-arrow-path" class="w-8 h-8 mx-auto mb-2 animate-spin text-primary" />
+              <UIcon v-else name="i-heroicons-cloud-arrow-up" class="w-8 h-8 mx-auto mb-2 text-gray-400" />
+              <p class="text-sm font-medium text-white">{{ avatarUploading ? 'Uploading...' : 'Click to upload' }}</p>
+              <p class="text-xs text-gray-500 mt-1">PNG, JPG or GIF up to 5MB</p>
+            </div>
+          </div>
+
+          <!-- Default Avatars -->
+          <div class="mb-6">
+            <label class="block text-xs uppercase font-bold text-gray-500 mb-3 tracking-wider">Or Choose a Default</label>
+            <div class="grid grid-cols-4 gap-3">
+              <button
+                v-for="(avatar, index) in avatarDefaultOptions"
+                :key="index"
+                type="button"
+                @click="selectDefaultAvatar(avatar)"
+                class="aspect-square rounded-full overflow-hidden border-2 transition-all hover:scale-105"
+                :class="form.avatar_url === avatar ? 'border-primary ring-2 ring-primary/50' : 'border-white/10'"
+              >
+                <img :src="avatar" alt="Default avatar" class="w-full h-full object-cover bg-gray-800" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex gap-3 pt-4">
+          <button 
+            type="button" 
+            @click="backToProfile"
+            class="flex-1 bg-white/5 hover:bg-white/10 text-white font-bold py-3 rounded-lg transition-colors"
+          >
+            &larr; Back
+          </button>
+          <button 
+            type="button" 
+            @click="skipAvatar"
+            class="flex-1 bg-white/5 hover:bg-white/10 text-white font-bold py-3 rounded-lg transition-colors"
+          >
+            Skip for now
+          </button>
+          <button 
+            type="submit" 
+            :disabled="loading || avatarUploading"
             class="flex-[2] bg-primary hover:bg-[#3d34d9] text-white font-bold py-3 rounded-lg shadow-lg transition-all disabled:opacity-50 flex justify-center items-center gap-2"
           >
             <UIcon v-if="loading" name="i-heroicons-arrow-path" class="animate-spin w-5 h-5" />
@@ -238,6 +475,10 @@ const handleSignup = async () => {
       <p class="text-sm text-gray-500">
         Already have an account? 
         <NuxtLink to="/login" class="text-primary font-bold hover:text-white transition-colors">Sign In</NuxtLink>
+      </p>
+      <p v-if="step === 1" class="text-xs text-gray-600 mt-2">
+        Want to skip avatar setup? 
+        <button @click="step = 2; step2Valid = true" class="text-primary hover:text-white underline transition-colors">Skip to profile</button>
       </p>
     </div>
 
