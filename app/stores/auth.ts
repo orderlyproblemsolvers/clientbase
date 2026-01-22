@@ -3,12 +3,13 @@ import { defineStore } from 'pinia'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    user: null as any,
     loading: false,
   }),
   actions: {
     async login(email: string, password: string) {
       const supabase = useSupabaseClient()
+      const user = useSupabaseUser() // <--- 1. Get the user composable
+      
       this.loading = true
       
       try {
@@ -19,8 +20,14 @@ export const useAuthStore = defineStore('auth', {
 
         if (error) throw error
         
-        // Supabase auto-updates the user state, so we just redirect
+        // <--- 2. THE FIX: Manually update the user state immediately
+        if (data.user) {
+            user.value = data.user
+        }
+        
+        // 3. Now it is safe to redirect
         return navigateTo('/')
+        
       } catch (error: any) {
         throw error
       } finally {
@@ -30,7 +37,13 @@ export const useAuthStore = defineStore('auth', {
 
     async logout() {
       const supabase = useSupabaseClient()
+      const user = useSupabaseUser()
+      
       await supabase.auth.signOut()
+      
+      // Optional: Clear user state manually on logout too for instant UI updates
+      user.value = null
+      
       return navigateTo('/login')
     }
   }

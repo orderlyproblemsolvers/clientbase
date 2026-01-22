@@ -16,7 +16,7 @@ const files = ref<any[]>([])
 const events = ref<any[]>([]) 
 const uploading = ref(false)
 const isDeleting = ref(false)
-const copiedSecretId = ref<string | null>(null) // For UX feedback
+const copiedSecretId = ref<string | null>(null)
 
 // Secrets Form
 const showSecretModal = ref(false)
@@ -35,20 +35,16 @@ const newEvent = ref({ title: '', date: '', type: 'deadline' })
 const fetchData = async () => {
   loading.value = true
   try {
-    // A. Get Client Info
     const { data: cData } = await client.from('clients').select('*').eq('id', clientId).single()
     clientData.value = cData
     notesDraft.value = cData.notes || ''
 
-    // B. Get Secrets (Server Decryption)
     const sData = await $fetch(`/api/secrets?client_id=${clientId}`)
     secrets.value = sData?.map((s: any) => ({ ...s, isRevealed: false })) || []
 
-    // C. Get Files
     const { data: fData } = await client.from('files').select('*').eq('client_id', clientId).order('created_at', { ascending: false })
     files.value = fData || []
 
-    // D. Get Events
     const { data: eData } = await client.from('events').select('*').eq('client_id', clientId).order('event_date', { ascending: true })
     events.value = eData || []
 
@@ -278,6 +274,7 @@ onMounted(() => fetchData())
         </div>
         
         <div class="bg-secondary/40 border border-white/5 rounded-2xl overflow-hidden">
+          
           <div v-if="secrets.length === 0" class="p-12 text-center flex flex-col items-center justify-center text-gray-500">
             <div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3">
               <UIcon name="i-heroicons-lock-closed" class="w-6 h-6 opacity-50" />
@@ -285,49 +282,49 @@ onMounted(() => fetchData())
             <p>No secrets stored yet.</p>
           </div>
           
-          <table v-else class="w-full text-left border-collapse">
-            <thead class="bg-white/5 text-gray-400 text-xs uppercase tracking-widest border-b border-white/5">
-              <tr>
-                <th class="p-4 font-bold">Key Name</th>
-                <th class="p-4 font-bold">Value</th>
-                <th class="p-4 text-right font-bold">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-white/5">
-              <tr v-for="s in secrets" :key="s.id" class="group hover:bg-white/5 transition-colors">
-                <td class="p-4 text-white font-medium flex items-center gap-2">
-                  <UIcon name="i-heroicons-key" class="w-4 h-4 text-gray-500" />
-                  {{ s.key_name }}
-                </td>
-                <td class="p-4 font-mono">
-                  <div class="flex items-center gap-3">
-                    <div class="relative bg-base px-3 py-1.5 rounded-md border border-white/5 min-w-[200px] flex items-center">
-                      <span :class="!s.isRevealed ? 'blur-sm select-none opacity-50' : 'opacity-100'" class="text-sm transition-all duration-300">
-                        {{ s.isRevealed ? s.value : '••••••••••••••••' }}
-                      </span>
-                    </div>
-                  </div>
-                </td>
-                <td class="p-4 text-right">
-                  <div class="flex justify-end items-center gap-1">
-                    <button @click="s.isRevealed = !s.isRevealed" class="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors" title="Toggle Visibility">
-                      <UIcon :name="s.isRevealed ? 'i-heroicons-eye-slash' : 'i-heroicons-eye'" class="w-5 h-5" />
-                    </button>
-                    
-                    <button @click="copyToClipboard(s.value, s.id)" class="p-2 hover:bg-white/10 rounded-lg transition-colors" :class="copiedSecretId === s.id ? 'text-green-400' : 'text-gray-400 hover:text-white'" title="Copy">
-                      <UIcon :name="copiedSecretId === s.id ? 'i-heroicons-check' : 'i-heroicons-clipboard'" class="w-5 h-5" />
-                    </button>
-                    
-                    <div class="h-4 w-px bg-white/10 mx-1"></div>
-                    
-                    <button @click="deleteSecret(s.id)" class="p-2 hover:bg-red-500/10 rounded-lg text-gray-400 hover:text-red-500 transition-colors" title="Delete">
-                      <UIcon name="i-heroicons-trash" class="w-5 h-5" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div v-else class="hidden md:grid grid-cols-12 gap-4 p-4 bg-white/5 text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-white/5">
+            <div class="col-span-3">Key Name</div>
+            <div class="col-span-7">Value</div>
+            <div class="col-span-2 text-right">Actions</div>
+          </div>
+
+          <div v-for="s in secrets" :key="s.id" class="p-4 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors flex flex-col md:grid md:grid-cols-12 gap-4 items-start md:items-center">
+            
+            <div class="md:col-span-3 font-medium text-white w-full flex justify-between md:justify-start items-center">
+               <div class="flex items-center gap-2">
+                 <UIcon name="i-heroicons-key" class="w-4 h-4 text-gray-500" />
+                 {{ s.key_name }}
+               </div>
+               <UIcon :name="s.isRevealed ? 'i-heroicons-eye-slash' : 'i-heroicons-eye'" class="w-4 h-4 text-gray-600 md:hidden" />
+            </div>
+
+            <div class="md:col-span-7 w-full font-mono text-sm">
+               <button 
+                @click="s.isRevealed = !s.isRevealed" 
+                class="w-full text-left relative bg-base px-3 py-2.5 rounded-lg border border-white/5 hover:border-primary/50 transition-colors group"
+               >
+                  <span :class="!s.isRevealed ? 'blur-sm select-none opacity-50' : 'opacity-100'" class="block transition-all duration-300 truncate">
+                    {{ s.isRevealed ? s.value : '••••••••••••••••••••••••' }}
+                  </span>
+                  <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-600 uppercase font-bold opacity-0 group-hover:opacity-100 transition-opacity hidden md:block">
+                    {{ s.isRevealed ? 'Hide' : 'Show' }}
+                  </span>
+               </button>
+            </div>
+
+            <div class="md:col-span-2 flex items-center justify-end gap-2 w-full md:w-auto mt-1 md:mt-0">
+               <button @click="copyToClipboard(s.value, s.id)" class="flex-1 md:flex-none py-2 md:p-2 bg-white/5 md:bg-transparent rounded-lg hover:bg-white/10 transition-colors flex items-center justify-center gap-2" :class="copiedSecretId === s.id ? 'text-green-400' : 'text-gray-400 hover:text-white'">
+                 <UIcon :name="copiedSecretId === s.id ? 'i-heroicons-check' : 'i-heroicons-clipboard'" class="w-5 h-5" />
+                 <span class="text-xs font-bold md:hidden">{{ copiedSecretId === s.id ? 'Copied' : 'Copy' }}</span>
+               </button>
+
+               <button @click="deleteSecret(s.id)" class="flex-1 md:flex-none py-2 md:p-2 bg-white/5 md:bg-transparent rounded-lg hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors flex items-center justify-center gap-2">
+                 <UIcon name="i-heroicons-trash" class="w-5 h-5" />
+                 <span class="text-xs font-bold md:hidden">Delete</span>
+               </button>
+            </div>
+
+          </div>
         </div>
       </div>
 
@@ -530,13 +527,11 @@ onMounted(() => fetchData())
 </template>
 
 <style scoped>
-/* Custom Scrollbar for Notes */
 textarea::-webkit-scrollbar { width: 8px; }
 textarea::-webkit-scrollbar-track { background: transparent; }
 textarea::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
 textarea::-webkit-scrollbar-thumb:hover { background: #475569; }
 
-/* Prose Overrides */
 :deep(.prose) { color: #cbd5e1; }
 :deep(.prose h1), :deep(.prose h2), :deep(.prose h3) { color: white; font-weight: 700; margin-top: 1.5em; margin-bottom: 0.5em; }
 :deep(.prose code) { background: #1e293b; color: #818cf8; padding: 0.2em 0.4em; border-radius: 4px; font-weight: 600; }
