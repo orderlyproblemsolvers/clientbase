@@ -10,6 +10,9 @@ const searchQuery = ref('')
 const showModal = ref(false)
 const creating = ref(false)
 
+// WIZARD STATE
+const currentStep = ref(1)
+
 // Categories List
 const categories = ['Educational', 'Fintech', 'Internal', 'Development', 'Personal']
 
@@ -34,11 +37,15 @@ const filteredClients = computed(() => {
   )
 })
 
+const canProceed = computed(() => {
+  if (currentStep.value === 1) return newClient.value.name.length > 0
+  return true
+})
+
 // --- Actions ---
 const fetchDashboardData = async () => {
   loading.value = true
   try {
-    // 1. Fetch Clients
     const { data: clientData, error: clientError } = await client
       .from('clients')
       .select('*')
@@ -47,13 +54,12 @@ const fetchDashboardData = async () => {
     if (clientError) throw clientError
     clients.value = clientData || []
 
-    // 2. Fetch Upcoming Events
     const { data: eventData, error: eventError } = await client
       .from('events')
       .select('*, clients(id, name)')
-      .gte('event_date', new Date().toISOString()) // Only future dates
-      .eq('is_completed', false) // Only active tasks
-      .order('event_date', { ascending: true }) // Soonest first
+      .gte('event_date', new Date().toISOString())
+      .eq('is_completed', false)
+      .order('event_date', { ascending: true })
       .limit(4)
 
     if (eventError) console.error('Error fetching events:', eventError)
@@ -66,6 +72,18 @@ const fetchDashboardData = async () => {
   }
 }
 
+// Wizard Logic
+const closeModal = () => {
+  showModal.value = false
+  setTimeout(() => {
+    currentStep.value = 1
+    newClient.value = { 
+      name: '', website: '', category: 'Development', 
+      contact_name: '', contact_email: '', contact_phone: '' 
+    }
+  }, 300)
+}
+
 const createClient = async () => {
   if (!newClient.value.name) return 
   creating.value = true
@@ -73,12 +91,7 @@ const createClient = async () => {
     const { error } = await client.from('clients').insert(newClient.value)
     if (error) throw error
 
-    showModal.value = false
-    // Reset form
-    newClient.value = { 
-      name: '', website: '', category: 'Development', 
-      contact_name: '', contact_email: '', contact_phone: '' 
-    } 
+    closeModal()
     await fetchDashboardData() 
   } catch (error: any) {
     alert('Error creating client: ' + error.message)
@@ -92,7 +105,6 @@ const getDaysLeft = (dateStr: string) => {
   return Math.ceil(diff / (1000 * 3600 * 24))
 }
 
-// Helper for category icons
 const getCategoryIcon = (cat: string) => {
   switch(cat) {
     case 'Educational': return 'i-heroicons-academic-cap';
@@ -247,62 +259,104 @@ onMounted(() => {
     </div>
 
     <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div @click="showModal = false" class="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity"></div>
+      <div @click="closeModal" class="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity"></div>
       
       <div class="relative w-full max-w-lg bg-[#0f172a] border border-white/10 rounded-2xl p-8 shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200">
-        <div class="flex items-center justify-between mb-6">
-          <h2 class="text-xl font-bold text-white flex items-center gap-2">
-            <UIcon name="i-heroicons-briefcase" class="w-5 h-5 text-primary" />
-            Add New Client
-          </h2>
-          <button @click="showModal = false" class="text-gray-500 hover:text-white transition-colors">
-            <UIcon name="i-heroicons-x-mark" class="w-6 h-6" />
-          </button>
+        
+        <div class="flex items-center justify-between mb-8">
+          <div>
+            <h2 class="text-xl font-bold text-white">Add New Client</h2>
+            <p class="text-xs text-gray-500 mt-1">Step {{ currentStep }} of 2: <span class="text-primary font-medium">{{ currentStep === 1 ? 'Company Profile' : 'Primary Contact' }}</span></p>
+          </div>
+          <div class="flex gap-1.5">
+            <div :class="currentStep >= 1 ? 'bg-primary w-6' : 'bg-white/10 w-2'" class="h-1.5 rounded-full transition-all duration-300"></div>
+            <div :class="currentStep >= 2 ? 'bg-primary w-6' : 'bg-white/10 w-2'" class="h-1.5 rounded-full transition-all duration-300"></div>
+          </div>
         </div>
         
-        <form @submit.prevent="createClient" class="space-y-5">
-          <div>
-            <label class="block text-[10px] uppercase font-bold text-gray-500 mb-1">Client Name</label>
-            <div class="relative">
-               <UIcon name="i-heroicons-building-office-2" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
-              <input v-model="newClient.name" type="text" required class="w-full bg-black/40 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:outline-none focus:border-primary placeholder-gray-700" placeholder="e.g. Acme Corp"/>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-4">
+        <form @submit.prevent="createClient" class="min-h-50 flex flex-col justify-between">
+          
+          <div v-if="currentStep === 1" class="space-y-5 animate-in slide-in-from-right-8 fade-in duration-300">
             <div>
-              <label class="block text-[10px] uppercase font-bold text-gray-500 mb-1">Category</label>
+              <label class="block text-[10px] uppercase font-bold text-gray-500 mb-1">Client Name <span class="text-red-500">*</span></label>
               <div class="relative">
-                <select v-model="newClient.category" class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary appearance-none cursor-pointer">
-                  <option v-for="cat in categories" :key="cat" :value="cat" class="bg-secondary text-gray-300">{{ cat }}</option>
-                </select>
-                <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4 pointer-events-none" />
+                 <UIcon name="i-heroicons-building-office-2" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
+                <input v-model="newClient.name" type="text" autofocus required class="w-full bg-black/40 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:outline-none focus:border-primary placeholder-gray-700 transition-colors" placeholder="e.g. Acme Corp"/>
               </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-[10px] uppercase font-bold text-gray-500 mb-1">Category</label>
+                <div class="relative">
+                  <select v-model="newClient.category" class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary appearance-none cursor-pointer transition-colors">
+                    <option v-for="cat in categories" :key="cat" :value="cat" class="bg-secondary text-gray-300">{{ cat }}</option>
+                  </select>
+                  <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4 pointer-events-none" />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-[10px] uppercase font-bold text-gray-500 mb-1">Website</label>
+                <input v-model="newClient.website" type="url" class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary placeholder-gray-700 transition-colors" placeholder="https://..."/>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="currentStep === 2" class="space-y-5 animate-in slide-in-from-right-8 fade-in duration-300">
+            <div class="bg-primary/5 border border-primary/10 rounded-xl p-4 mb-4 flex items-center gap-3">
+               <div class="w-10 h-10 rounded-full bg-base flex items-center justify-center text-lg font-bold text-white border border-white/5">
+                 {{ newClient.name.charAt(0).toUpperCase() }}
+               </div>
+               <div>
+                 <p class="text-white font-bold text-sm">{{ newClient.name }}</p>
+                 <p class="text-xs text-gray-500">{{ newClient.category }}</p>
+               </div>
             </div>
 
             <div>
-              <label class="block text-[10px] uppercase font-bold text-gray-500 mb-1">Website</label>
-              <input v-model="newClient.website" type="url" class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary placeholder-gray-700" placeholder="https://..."/>
+               <label class="block text-[10px] uppercase font-bold text-gray-500 mb-1">Contact Name</label>
+               <input v-model="newClient.contact_name" type="text" autofocus placeholder="Jane Doe" class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-sm text-white focus:border-primary focus:outline-none placeholder-gray-700 transition-colors" />
             </div>
-          </div>
 
-          <div class="pt-4 mt-2 border-t border-white/5">
-            <p class="text-[10px] uppercase font-bold text-primary tracking-widest mb-4 flex items-center gap-1">
-              <UIcon name="i-heroicons-user-circle" class="w-4 h-4" />
-              Primary Contact
-            </p>
-            <div class="space-y-3">
-              <input v-model="newClient.contact_name" type="text" placeholder="Contact Name" class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none placeholder-gray-700" />
-              <div class="grid grid-cols-2 gap-3">
-                <input v-model="newClient.contact_email" type="email" placeholder="Email Address" class="bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none placeholder-gray-700" />
-                <input v-model="newClient.contact_phone" type="tel" placeholder="Phone Number" class="bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:border-primary focus:outline-none placeholder-gray-700" />
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[10px] uppercase font-bold text-gray-500 mb-1">Email</label>
+                <input v-model="newClient.contact_email" type="email" placeholder="jane@acme.com" class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-sm text-white focus:border-primary focus:outline-none placeholder-gray-700 transition-colors" />
+              </div>
+              <div>
+                <label class="block text-[10px] uppercase font-bold text-gray-500 mb-1">Phone</label>
+                <input v-model="newClient.contact_phone" type="tel" placeholder="+1 234..." class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-sm text-white focus:border-primary focus:outline-none placeholder-gray-700 transition-colors" />
               </div>
             </div>
           </div>
 
-          <div class="flex gap-3 pt-4">
-            <button type="button" @click="showModal = false" class="flex-1 px-4 py-3 rounded-lg text-gray-400 hover:text-white transition-colors font-medium">Cancel</button>
-            <button type="submit" :disabled="creating" class="flex-1 bg-primary hover:bg-[#3d34d9] text-white px-4 py-3 rounded-lg font-bold shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center gap-2">
+          <div class="flex gap-3 pt-8 mt-4 border-t border-white/5">
+            <button 
+              type="button" 
+              @click="currentStep === 1 ? closeModal() : currentStep--" 
+              class="px-6 py-3 rounded-lg text-gray-400 hover:text-white transition-colors font-medium text-sm"
+            >
+              {{ currentStep === 1 ? 'Cancel' : 'Back' }}
+            </button>
+            
+            <button 
+              v-if="currentStep === 1"
+              type="button" 
+              @click="currentStep++"
+              :disabled="!canProceed"
+              class="flex-1 bg-primary hover:bg-[#3d34d9] text-white px-4 py-3 rounded-lg font-bold shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
+            >
+              Next Step
+              <UIcon name="i-heroicons-arrow-right" class="w-4 h-4" />
+            </button>
+
+            <button 
+              v-else
+              type="submit" 
+              :disabled="creating" 
+              class="flex-1 bg-primary hover:bg-[#3d34d9] text-white px-4 py-3 rounded-lg font-bold shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
+            >
               <UIcon v-if="creating" name="i-heroicons-arrow-path" class="w-5 h-5 animate-spin" />
               <span v-else>Create Client</span>
             </button>

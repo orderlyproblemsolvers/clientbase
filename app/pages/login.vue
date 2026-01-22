@@ -29,7 +29,7 @@ const handleLogin = async () => {
     
     <div class="text-center">
       <h1 class="text-3xl font-bold text-white mb-2 tracking-tight">Welcome Back</h1>
-      <p class="text-gray-400 text-sm">Sign in to access Client Base</p>
+      <p class="text-gray-400 text-sm">Sign in to access ClientBase</p>
     </div>
 
     <form @submit.prevent="handleLogin" class="space-y-5">

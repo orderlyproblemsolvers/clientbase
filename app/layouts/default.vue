@@ -44,9 +44,9 @@ watch(
     >
       <NuxtLink to="/">
         <img 
-          src="/img/clientbaselogo-min.png" 
+          src="/img/clientbaselogo-white.png" 
           alt="Client Base OPS" 
-          class="h-8 w-auto object-contain" 
+          class="h-12 w-auto object-contain" 
         />
       </NuxtLink>
 
@@ -74,7 +74,7 @@ watch(
           isMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
           /* Desktop: Dynamic Width based on Expansion state */
           isExpanded ? 'lg:w-64' : 'lg:w-20',
-          /* Base styles: Added w-64 to ensure mobile drawer has width */
+          /* Base styles: w-64 ensures mobile drawer is wide */
           'fixed inset-y-0 left-0 w-64 bg-secondary border-r border-white/5 flex flex-col z-50 transition-all duration-300 ease-in-out lg:static lg:z-auto'
         ]"
       >
@@ -88,7 +88,7 @@ watch(
             <img 
               src="/img/clientbaselogo-white.png" 
               alt="Client Base OPS" 
-              class="h-10 w-auto object-contain" 
+              class="h-16 w-auto object-contain" 
             />
           </NuxtLink>
 
@@ -100,7 +100,7 @@ watch(
             <img 
               src="/img/clientbaselogo-min.png" 
               alt="Client Base" 
-              class="h-8 w-auto object-contain drop-shadow-lg" 
+              class="h-12 w-auto object-contain drop-shadow-lg" 
             />
           </NuxtLink>
         </div>
