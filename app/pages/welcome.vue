@@ -136,7 +136,7 @@ const copySnippetCode = (id: number, code: string) => {
 
 // ==================== SECRETS VAULT STATE ====================
 const secrets = ref([
-  { id: 1, name: 'STRIPE_KEY', value: 'sk_test_4eC39HqLyjWDarjtT1zdp7dc', revealed: false },
+  { id: 1, name: 'RANDOM_API_KEY', value: 'random_test_4eC39HqLyjWDarjtT1zdp7dc', revealed: false },
   { id: 2, name: 'DATABASE_URL', value: 'postgresql://user:pass@localhost:5432/db', revealed: false }
 ])
 
