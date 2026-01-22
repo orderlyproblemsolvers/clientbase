@@ -23,9 +23,6 @@ const isCollapsed = ref(true); // Desktop: Default to "Mini Mode"
 const isHovered = ref(false);  // Desktop: Track mouse hover
 
 // Computed property to determine if the sidebar currently looks expanded
-// It is expanded if:
-// 1. It is NOT collapsed (user pinned it open)
-// 2. OR if the user is currently hovering over it
 const isExpanded = computed(() => {
   return !isCollapsed.value || isHovered.value
 })
@@ -47,9 +44,9 @@ watch(
     >
       <NuxtLink to="/">
         <img 
-          src="/img/clientbaselogo-white.png" 
+          src="/img/clientbaselogo-min.png" 
           alt="Client Base OPS" 
-          class="h-10 w-auto object-contain" 
+          class="h-8 w-auto object-contain" 
         />
       </NuxtLink>
 
@@ -77,7 +74,8 @@ watch(
           isMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
           /* Desktop: Dynamic Width based on Expansion state */
           isExpanded ? 'lg:w-64' : 'lg:w-20',
-          'fixed inset-y-0 left-0 bg-secondary border-r border-white/5 flex flex-col z-50 transition-all duration-300 ease-in-out lg:static lg:z-auto'
+          /* Base styles: Added w-64 to ensure mobile drawer has width */
+          'fixed inset-y-0 left-0 w-64 bg-secondary border-r border-white/5 flex flex-col z-50 transition-all duration-300 ease-in-out lg:static lg:z-auto'
         ]"
       >
         <div class="h-20 flex items-center justify-center border-b border-white/5 relative overflow-hidden">
@@ -90,7 +88,7 @@ watch(
             <img 
               src="/img/clientbaselogo-white.png" 
               alt="Client Base OPS" 
-              class="h-12 w-auto object-contain" 
+              class="h-10 w-auto object-contain" 
             />
           </NuxtLink>
 
@@ -99,9 +97,11 @@ watch(
              class="transition-all duration-300 absolute inset-0 flex items-center justify-center"
              :class="isExpanded ? 'opacity-0 scale-90 pointer-events-none' : 'opacity-100 scale-100'"
           >
-            <div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center font-black text-xl italic text-white shadow-lg shadow-primary/20">
-              C
-            </div>
+            <img 
+              src="/img/clientbaselogo-min.png" 
+              alt="Client Base" 
+              class="h-8 w-auto object-contain drop-shadow-lg" 
+            />
           </NuxtLink>
         </div>
 
@@ -110,7 +110,7 @@ watch(
           <NuxtLink
             to="/"
             class="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/5 transition-all group overflow-hidden whitespace-nowrap"
-            :class="!isExpanded ? 'justify-center' : ''"
+            :class="!isExpanded ? 'lg:justify-center' : ''"
             :title="!isExpanded ? 'Dashboard' : ''"
           >
             <UIcon name="i-heroicons-squares-2x2" class="w-6 h-6 text-gray-400 group-hover:text-primary shrink-0 transition-colors" />
@@ -132,7 +132,7 @@ watch(
           <NuxtLink
             to="/library"
             class="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/5 transition-all group overflow-hidden whitespace-nowrap"
-            :class="!isExpanded ? 'justify-center' : ''"
+            :class="!isExpanded ? 'lg:justify-center' : ''"
             :title="!isExpanded ? 'Code Library' : ''"
           >
             <UIcon name="i-heroicons-code-bracket" class="w-6 h-6 text-gray-400 group-hover:text-primary shrink-0 transition-colors" />
@@ -147,7 +147,7 @@ watch(
           <NuxtLink
             to="/retainers"
             class="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/5 transition-all group overflow-hidden whitespace-nowrap"
-            :class="!isExpanded ? 'justify-center' : ''"
+            :class="!isExpanded ? 'lg:justify-center' : ''"
             :title="!isExpanded ? 'Retainers' : ''"
           >
             <UIcon name="i-heroicons-banknotes" class="w-6 h-6 text-gray-400 group-hover:text-primary shrink-0 transition-colors" />
@@ -162,7 +162,7 @@ watch(
           <NuxtLink 
             to="/settings" 
             class="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/5 transition-all group overflow-hidden whitespace-nowrap mt-auto"
-            :class="!isExpanded ? 'justify-center' : ''"
+            :class="!isExpanded ? 'lg:justify-center' : ''"
             :title="!isExpanded ? 'Settings' : ''"
           >
             <UIcon name="i-heroicons-cog-6-tooth" class="w-6 h-6 text-gray-400 group-hover:text-primary shrink-0 transition-colors" />
@@ -179,7 +179,7 @@ watch(
           
           <div 
             class="flex items-center gap-3 p-4 transition-all duration-300"
-            :class="!isExpanded ? 'justify-center px-2' : ''"
+            :class="!isExpanded ? 'lg:justify-center px-2' : ''"
           >
             <div
               class="w-8 h-8 rounded-full bg-primary flex items-center justify-center font-bold text-sm text-white shadow-lg shrink-0"
@@ -200,7 +200,7 @@ watch(
              <button
               @click="auth.logout"
               class="flex-1 text-left px-4 py-3 text-xs text-red-400 hover:bg-red-500/10 transition-all flex items-center gap-2 overflow-hidden whitespace-nowrap"
-              :class="!isExpanded ? 'justify-center' : ''"
+              :class="!isExpanded ? 'lg:justify-center' : ''"
               :title="!isExpanded ? 'Logout' : ''"
             >
               <UIcon name="i-heroicons-arrow-left-on-rectangle" class="w-4 h-4 shrink-0" />
@@ -228,13 +228,11 @@ watch(
 </template>
 
 <style scoped>
-/* Updated Selector: Only apply active styles to links inside the NAV tag */
 nav .router-link-active {
   background: rgba(255, 255, 255, 0.05);
   color: var(--color-primary); 
 }
 
-/* Ensure smooth width transition */
 aside {
   will-change: width;
 }
