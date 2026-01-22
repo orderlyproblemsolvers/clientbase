@@ -9,7 +9,7 @@ export default defineNuxtRouteMiddleware((to, from) => {
   if (!user.value) {
     // If they are trying to go somewhere other than a public page, redirect to login
     if (!publicRoutes.includes(to.path)) {
-      return navigateTo('/')
+      return navigateTo('/welcome')
     }
   } 
   
