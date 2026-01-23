@@ -139,7 +139,6 @@ const handleAvatarChange = async (e: any) => {
     showToast('Avatar saved successfully!', 'success')
     
   } catch (err: any) {
-    console.error(err)
     showToast(err.message, 'error')
     avatarPreview.value = null 
   } finally {
@@ -173,7 +172,6 @@ const updateProfile = async () => {
     
     showToast('Profile updated successfully!')
   } catch (error: any) {
-    console.error(error)
     showToast(error.message, 'error')
   } finally {
     saving.value = false

@@ -76,7 +76,6 @@ const handleAvatarUpload = async (file: File) => {
     avatarPreview.value = data.secure_url
     return data.secure_url
   } catch (error: any) {
-    console.error('Avatar upload failed:', error)
     errorMsg.value = 'Failed to upload avatar. Please try another image or skip.'
     throw error
   } finally {
@@ -195,7 +194,6 @@ const handleSignup = async () => {
     navigateTo('/login')
 
   } catch (e: any) {
-    console.error(e)
     errorMsg.value = e.message || "Registration failed. Please try again."
   } finally {
     loading.value = false
@@ -225,7 +223,6 @@ const quickSignup = async () => {
     alert("Account created! Please check your email to verify your account.")
     navigateTo('/login')
   } catch (e: any) {
-    console.error(e)
     errorMsg.value = e.message || "Registration failed. Please try again."
   } finally {
     loading.value = false

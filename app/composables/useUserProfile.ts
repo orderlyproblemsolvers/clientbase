@@ -25,10 +25,7 @@ export const useUserProfile = () => {
        
        if (data.session?.user?.id) {
          userId = data.session.user.id
-         console.log("⚠️ Hydration Lag detected: Recovered User ID from Session directly.")
        } else {
-         // If Plan B also fails, we truly have no user. Stop.
-         console.warn('⚠️ Profile fetch skipped: User ID is truly missing.')
          return
        }
     }
@@ -44,7 +41,6 @@ export const useUserProfile = () => {
     // --- FETCH EXECUTION ---
 
     profile.value.loading = true
-    console.log('🔄 Fetching profile for ID:', userId)
 
     try {
       const { data, error } = await supabase
@@ -63,7 +59,6 @@ export const useUserProfile = () => {
           fetched: true,
           loading: false
         }
-        console.log('✅ Profile loaded:', data.full_name)
       }
     } catch (e: any) {
       console.error('❌ Profile fetch failed:', e.message)
@@ -81,7 +76,6 @@ export const useUserProfile = () => {
       fetched: false,
       loading: false
     }
-    console.log('🗑️ Profile reset')
   }
 
   // 3. Setter (for Settings page)
