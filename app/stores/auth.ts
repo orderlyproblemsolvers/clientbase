@@ -8,25 +8,34 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     async login(email: string, password: string) {
       const supabase = useSupabaseClient()
+      const user = useSupabaseUser()
       
       this.loading = true
       
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email,
           password
         })
 
         if (error) throw error
         
-        // IMPORTANT: Do NOT manually set user.value
-        // Let Supabase's reactive system handle it naturally
-        // This ensures all watchers trigger correctly
+        // --- THE CLEANER FIX ---
+        // Instead of forcing the value, we politely wait for 
+        // Nuxt's reactivity system to catch up with Supabase.
         
-        // Wait a moment for Supabase to update its internal state
-        await new Promise(resolve => setTimeout(resolve, 100))
+        if (!user.value) {
+          await new Promise<void>((resolve) => {
+            const unwatch = watch(user, (val) => {
+              if (val) {
+                unwatch() // Stop watching once we have the user
+                resolve()
+              }
+            })
+          })
+        }
         
-        // Now it is safe to redirect
+        // Now we know for a fact the Middleware will pass
         return navigateTo('/')
         
       } catch (error: any) {
@@ -38,19 +47,10 @@ export const useAuthStore = defineStore('auth', {
 
     async logout() {
       const supabase = useSupabaseClient()
-      
-      // Get the profile reset function BEFORE logout
       const { reset: resetProfile } = useUserProfile()
       
-      // Reset profile immediately (this clears the old avatar)
       resetProfile()
-      
-      // Now sign out
       await supabase.auth.signOut()
-      
-      // Give it a moment for the auth system to update
-      await new Promise(resolve => setTimeout(resolve, 50))
-      
       return navigateTo('/login')
     }
   }
