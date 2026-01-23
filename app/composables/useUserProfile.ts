@@ -1,45 +1,56 @@
 // composables/useUserProfile.ts
 export const useUserProfile = () => {
-  // We use useState to share this data across pages/components
+  // Global State
   const profile = useState('user-profile', () => ({
     full_name: '',
     role: '',
     avatar_url: null as string | null,
     fetched: false,
-    loading: false,
-    error: null as string | null
+    loading: false
   }))
 
   const supabase = useSupabaseClient()
   const user = useSupabaseUser()
 
-  // 🔥 NEW: Reset function to clear profile state
-  const reset = () => {
-    profile.value = {
-      full_name: '',
-      role: '',
-      avatar_url: null,
-      fetched: false,
-      loading: false,
-      error: null
-    }
-  }
-
-  // Helper to fetch data from DB
+  // 1. Fetch Logic
   const fetch = async () => {
-    if (!user.value) {
-      reset() // Reset if no user
-      return
+    // --- 🛡️ ID RECOVERY LOGIC 🛡️ ---
+    
+    // Start by trying the reactive user object
+    let userId = user.value?.id
+
+    // If that fails (is null, undefined, or the string "undefined"), try Plan B
+    if (!userId || typeof userId !== 'string' || userId === 'undefined') {
+       const { data } = await supabase.auth.getSession()
+       
+       if (data.session?.user?.id) {
+         userId = data.session.user.id
+         console.log("⚠️ Hydration Lag detected: Recovered User ID from Session directly.")
+       } else {
+         // If Plan B also fails, we truly have no user. Stop.
+         console.warn('⚠️ Profile fetch skipped: User ID is truly missing.')
+         return
+       }
     }
+
+    // --- STANDARD GUARDS ---
+
+    // Don't fetch if already busy
+    if (profile.value.loading) return
+
+    // Don't fetch if we already have data (remove this line if you want to force refresh)
+    if (profile.value.fetched && profile.value.full_name) return
+
+    // --- FETCH EXECUTION ---
 
     profile.value.loading = true
-    profile.value.error = null
+    console.log('🔄 Fetching profile for ID:', userId)
 
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('full_name, role, avatar_url')
-        .eq('id', user.value.id)
+        .eq('id', userId) // <--- uses the recovered userId variable
         .single()
 
       if (error) throw error
@@ -50,70 +61,33 @@ export const useUserProfile = () => {
           role: data.role || 'Team Member',
           avatar_url: data.avatar_url,
           fetched: true,
-          loading: false,
-          error: null
+          loading: false
         }
+        console.log('✅ Profile loaded:', data.full_name)
       }
-    } catch (error) {
-      console.error('Failed to fetch user profile:', error)
-      profile.value = {
-        ...profile.value,
-        fetched: true, // Mark as fetched even on error to prevent infinite retries
-        loading: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch profile'
-      }
+    } catch (e: any) {
+      console.error('❌ Profile fetch failed:', e.message)
+    } finally {
+      profile.value.loading = false
     }
   }
 
-  // Refresh method - forces a fresh fetch
-  const refresh = async () => {
-    // Reset fetched flag to force re-fetch
-    profile.value.fetched = false
-    await fetch()
+  // 2. Reset
+  const reset = () => {
+    profile.value = {
+      full_name: '',
+      role: '',
+      avatar_url: null,
+      fetched: false,
+      loading: false
+    }
+    console.log('🗑️ Profile reset')
   }
 
-  // Helper to update state manually (used by Settings page)
+  // 3. Setter (for Settings page)
   const setProfile = (data: Partial<typeof profile.value>) => {
     profile.value = { ...profile.value, ...data }
   }
 
-  // Watch for user changes and auto-fetch
-  watch(user, (newUser, oldUser) => {
-    console.log('User changed:', {
-      oldId: oldUser?.id?.substring(0, 8),
-      newId: newUser?.id?.substring(0, 8),
-      fetched: profile.value.fetched
-    })
-    
-    // 🔥 KEY FIX: Reset profile when user ID changes
-    if (newUser?.id !== oldUser?.id) {
-      if (newUser) {
-        // User logged in or switched - reset and fetch fresh
-        reset()
-        fetch()
-      } else {
-        // User logged out - reset only
-        reset()
-      }
-    } else if (!newUser && oldUser) {
-      // User logged out (both null now)
-      reset()
-    }
-  }, { immediate: true })
-
-  // Optional: Add computed properties for convenience
-  const isAuthenticated = computed(() => !!user.value)
-  const hasProfile = computed(() => profile.value.fetched && !!profile.value.full_name)
-  const isLoading = computed(() => profile.value.loading)
-
-  return { 
-    profile, 
-    fetch, 
-    refresh, 
-    reset, // 🔥 Export reset function
-    setProfile,
-    isAuthenticated,
-    hasProfile,
-    isLoading
-  }
+  return { profile, fetch, reset, setProfile }
 }
