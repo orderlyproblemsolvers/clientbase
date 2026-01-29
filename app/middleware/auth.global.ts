@@ -3,7 +3,7 @@ export default defineNuxtRouteMiddleware((to, from) => {
   const user = useSupabaseUser()
 
   // 1. List of public pages that don't require login
-  const publicRoutes = ['/login', '/signup', '/welcome']
+  const publicRoutes = ['/login', '/signup', '/welcome', '/confirm']
 
   // 2. Check if the user is NOT logged in
   if (!user.value) {
