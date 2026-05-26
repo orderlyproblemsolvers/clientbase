@@ -43,6 +43,7 @@ export default defineNuxtConfig({
     },
   },
   runtimeConfig:{
+    secretsEncryptionKey: process.env.SECRETS_ENCRYPTION_KEY,
     public: {
       CloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME,
       CloudinaryPreset: process.env.CLOUDINARY_PRESET
