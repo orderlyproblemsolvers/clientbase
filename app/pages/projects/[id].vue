@@ -61,7 +61,7 @@ const fetchData = async () => {
     }
 
     // Secrets (via encrypted server route)
-    const sData = await $fetch(`/api/secrets?project_id=${projectId}`)
+    const sData = await $fetch(`/api/secrets?client_id=${clientData.value?.id || null}&project_id=${projectId}`)
     secrets.value = (sData as any[])?.map((s: any) => ({ ...s, isRevealed: false })) || []
 
     // Files
@@ -128,7 +128,7 @@ const addSecret = async () => {
   try {
     await $fetch('/api/secrets', {
       method: 'POST',
-      body: { project_id: projectId, key_name: newSecret.value.name, value: newSecret.value.value },
+      body: { client_id: clientData.value?.id || null, project_id: projectId, key_name: newSecret.value.name, value: newSecret.value.value },
     })
     showSecretModal.value = false
     newSecret.value = { name: '', value: '' }
@@ -462,11 +462,11 @@ onMounted(() => fetchData())
           <textarea
             v-if="isEditingNotes && !isPreviewMode"
             v-model="notesDraft"
-            class="w-full bg-secondary border border-white/10 rounded-2xl p-8 text-gray-300 font-mono text-sm min-h-[500px] focus:outline-none focus:border-primary/50 transition-all leading-relaxed resize-y"
+            class="w-full bg-secondary border border-white/10 rounded-2xl p-8 text-gray-300 font-mono text-sm min-h-125 focus:outline-none focus:border-primary/50 transition-all leading-relaxed resize-y"
             placeholder="# Notes, credentials, deployment steps..."
           ></textarea>
 
-          <div v-else class="bg-secondary/20 border border-white/5 rounded-2xl p-8 min-h-[500px]">
+          <div v-else class="bg-secondary/20 border border-white/5 rounded-2xl p-8 min-h-125">
             <div
               v-if="notesDraft"
               class="prose prose-invert max-w-none prose-indigo leading-relaxed text-gray-300"
@@ -482,7 +482,7 @@ onMounted(() => fetchData())
 
       <!-- ── FILES TAB ────────────────────────────────────────────────────── -->
       <div v-if="activeTab === 'files'" class="animate-in fade-in duration-300">
-        <div class="mb-8 p-10 border-2 border-dashed border-white/10 rounded-2xl text-center hover:border-primary/50 hover:bg-white/[0.02] transition-all group relative cursor-pointer">
+        <div class="mb-8 p-10 border-2 border-dashed border-white/10 rounded-2xl text-center hover:border-primary/50 hover:bg-white/2 transition-all group relative cursor-pointer">
           <input type="file" @change="handleFileUpload" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" :disabled="uploading" />
           <div v-if="uploading" class="text-primary flex flex-col items-center animate-pulse">
             <UIcon name="i-heroicons-arrow-path" class="w-8 h-8 animate-spin mb-2" />

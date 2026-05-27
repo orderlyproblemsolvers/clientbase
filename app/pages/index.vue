@@ -271,13 +271,13 @@ onMounted(() => fetchDashboard())
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
 
         <!-- Total clients -->
-        <NuxtLink to="/clients" class="bg-secondary/50 border border-white/5 p-5 rounded-2xl relative overflow-hidden hover:bg-secondary/80 transition-colors group">
+        <div class="bg-secondary/50 border border-white/5 p-5 rounded-2xl relative overflow-hidden hover:bg-secondary/80 transition-colors group">
           <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <UIcon name="i-heroicons-users" class="w-16 h-16 text-primary" />
           </div>
           <p class="text-gray-500 text-[10px] uppercase font-bold tracking-widest mb-2">Total Clients</p>
           <p class="text-3xl font-bold text-white">{{ stats.totalClients }}</p>
-        </NuxtLink>
+        </div>
 
         <!-- Active projects -->
         <NuxtLink to="/projects" class="bg-secondary/50 border border-white/5 p-5 rounded-2xl relative overflow-hidden hover:bg-secondary/80 transition-colors group">

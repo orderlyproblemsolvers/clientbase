@@ -105,7 +105,6 @@ function getNavItems(state: 'expanded' | 'collapsed'): NavigationMenuItem[] {
           footer: 'border-t border-white/5 px-0 py-0',
           inner: 'bg-secondary divide-white/5',
           container: 'h-full',
-          overlay: 'backdrop-blur-sm bg-black/60',
         }"
       >
 
