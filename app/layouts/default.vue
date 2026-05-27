@@ -10,6 +10,11 @@ const { profile } = useUserProfile()
 // desktop → controls expanded / collapsed (icon) state
 // mobile  → controls modal/drawer open state
 const open = ref(true)
+const route = useRoute()
+
+watch(() => route.path, () => {
+  if (window.innerWidth < 1024) open.value = false
+})
 
 const displayName = computed(() =>
   profile.value.full_name ||
