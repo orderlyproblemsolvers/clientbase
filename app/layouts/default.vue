@@ -1,10 +1,19 @@
 <script setup lang="ts">
+import { watchEffect } from 'vue'
 import type { NavigationMenuItem } from '@nuxt/ui'
 import { useAuthStore } from '~/stores/auth'
 
 const auth = useAuthStore()
 const user = useSupabaseUser()
-const { profile } = useUserProfile()
+const { profile, fetch: fetchProfile } = useUserProfile()   // <-- destructure fetch
+
+// ── Fetch profile automatically when user becomes available ─────────────
+watchEffect(() => {
+  // Only fetch when we have a valid user ID
+  if (user.value && user.value.id && user.value.id !== 'undefined') {
+    fetchProfile()
+  }
+})
 
 // ── Responsive breakpoint detection ───────────────────────────────────────────
 const isMobile = ref(false)
@@ -23,7 +32,6 @@ onUnmounted(() => {
 })
 
 // ── Sidebar state ─────────────────────────────────────────────────────────────
-// On desktop, sidebar starts expanded; on mobile, closed.
 const open = ref(!isMobile.value)
 
 const route = useRoute()
@@ -31,10 +39,9 @@ watch(() => route.path, () => {
   if (isMobile.value) open.value = false
 })
 
-// Sync open state when breakpoint changes
 watch(isMobile, (mobile) => {
-  if (!mobile) open.value = true   // expand on desktop
-  else open.value = false          // close on mobile
+  if (!mobile) open.value = true
+  else open.value = false
 })
 
 const displayName = computed(() =>
@@ -160,7 +167,6 @@ function getNavItems(state: 'expanded' | 'collapsed'): NavigationMenuItem[] {
               </Transition>
             </NuxtLink>
 
-            <!-- Close button (mobile only) -->
             <button
               v-if="isMobile"
               class="p-2 text-slate-400 hover:text-white transition-colors"

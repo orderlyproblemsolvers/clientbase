@@ -388,7 +388,7 @@ onMounted(() => fetchData())
 
     <!-- Stats -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-      <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-5">
+      <div class="bg-white/3 border border-white/6 rounded-2xl p-5">
         <div class="flex items-start justify-between mb-3">
           <div class="w-8 h-8 rounded-xl bg-emerald-400/10 flex items-center justify-center">
             <UIcon name="i-heroicons-banknotes" class="w-4 h-4 text-emerald-400" />
@@ -397,7 +397,7 @@ onMounted(() => fetchData())
         <p class="text-2xl font-bold text-white tabular-nums">{{ fmt(stats.revenue) }}</p>
         <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mt-1">Revenue (Paid)</p>
       </div>
-      <button @click="filterStatus = 'pending'" class="bg-white/[0.03] border border-white/6 rounded-2xl p-5 text-left hover:bg-white/[0.05] transition-colors duration-150">
+      <button @click="filterStatus = 'pending'" class="bg-white/3 border border-white/6 rounded-2xl p-5 text-left hover:bg-white/[0.05] transition-colors duration-150">
         <div class="flex items-start justify-between mb-3">
           <div class="w-8 h-8 rounded-xl bg-amber-400/10 flex items-center justify-center">
             <UIcon name="i-heroicons-clock" class="w-4 h-4 text-amber-400" />
@@ -406,7 +406,7 @@ onMounted(() => fetchData())
         <p class="text-2xl font-bold text-amber-400 tabular-nums">{{ fmt(stats.outstanding) }}</p>
         <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mt-1">Outstanding</p>
       </button>
-      <button @click="filterStatus = 'overdue'" class="rounded-2xl p-5 text-left transition-colors duration-150" :class="stats.overdueCount > 0 ? 'bg-red-500/[0.06] border border-red-500/15 hover:bg-red-500/10' : 'bg-white/[0.03] border border-white/6 hover:bg-white/[0.05]'">
+      <button @click="filterStatus = 'overdue'" class="rounded-2xl p-5 text-left transition-colors duration-150" :class="stats.overdueCount > 0 ? 'bg-red-500/[0.06] border border-red-500/15 hover:bg-red-500/10' : 'bg-white/3 border border-white/6 hover:bg-white/[0.05]'">
         <div class="flex items-start justify-between mb-3">
           <div class="w-8 h-8 rounded-xl flex items-center justify-center" :class="stats.overdueCount > 0 ? 'bg-red-400/15' : 'bg-slate-400/10'">
             <UIcon name="i-heroicons-exclamation-triangle" class="w-4 h-4" :class="stats.overdueCount > 0 ? 'text-red-400' : 'text-slate-400'" />
@@ -415,7 +415,7 @@ onMounted(() => fetchData())
         <p class="text-2xl font-bold tabular-nums" :class="stats.overdueCount > 0 ? 'text-red-400' : 'text-white'">{{ stats.overdueCount }}</p>
         <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mt-1">Overdue</p>
       </button>
-      <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-5">
+      <div class="bg-white/3 border border-white/6 rounded-2xl p-5">
         <div class="flex items-start justify-between mb-3">
           <div class="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
             <UIcon name="i-heroicons-users" class="w-4 h-4 text-primary" />
@@ -437,7 +437,7 @@ onMounted(() => fetchData())
           v-model="searchQuery"
           type="search"
           placeholder="Search by client, description, or invoice number..."
-          class="w-full bg-white/[0.04] border border-white/8 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/40 focus:outline-none transition-all duration-150"
+          class="w-full bg-white/4 border border-white/8 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/40 focus:outline-none transition-all duration-150"
         />
       </div>
       <div class="bg-white/5 p-1 rounded-xl flex gap-1 overflow-x-auto">
@@ -456,7 +456,7 @@ onMounted(() => fetchData())
     </div>
 
     <!-- Table -->
-    <div class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
+    <div class="bg-white/3 border border-white/6 rounded-2xl overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-left whitespace-nowrap">
           <thead class="bg-white/5 text-slate-400 text-[10px] font-semibold uppercase tracking-wider border-b border-white/5">
@@ -503,7 +503,7 @@ onMounted(() => fetchData())
               v-else
               v-for="r in filtered"
               :key="r.id"
-              class="hover:bg-white/[0.03] transition-colors duration-150 group cursor-pointer"
+              class="hover:bg-white/3 transition-colors duration-150 group cursor-pointer"
               @click="openDetail(r)"
             >
               <td class="p-5">
@@ -520,7 +520,7 @@ onMounted(() => fetchData())
                 </div>
               </td>
               <td class="p-5">
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border bg-white/[0.03] border-white/6 text-slate-400">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border bg-white/3 border-white/6 text-slate-400">
                   {{ structureLabel[r.payment_structure || 'one_time'] }}
                 </span>
               </td>
@@ -640,11 +640,11 @@ onMounted(() => fetchData())
 
               <!-- Client + Project -->
               <div class="grid grid-cols-2 gap-3">
-                <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-4">
+                <div class="bg-white/3 border border-white/6 rounded-2xl p-4">
                   <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Client</p>
                   <p class="text-white font-semibold text-sm">{{ selectedInvoice.clients?.name }}</p>
                 </div>
-                <div v-if="selectedInvoice.projects?.name" class="bg-white/[0.03] border border-white/6 rounded-2xl p-4">
+                <div v-if="selectedInvoice.projects?.name" class="bg-white/3 border border-white/6 rounded-2xl p-4">
                   <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Project</p>
                   <p class="text-white font-semibold text-sm">{{ selectedInvoice.projects.name }}</p>
                 </div>
@@ -652,15 +652,15 @@ onMounted(() => fetchData())
 
               <!-- Dates -->
               <div class="grid grid-cols-3 gap-3">
-                <div v-if="selectedInvoice.start_date" class="bg-white/[0.03] border border-white/6 rounded-2xl p-3">
+                <div v-if="selectedInvoice.start_date" class="bg-white/3 border border-white/6 rounded-2xl p-3">
                   <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Issue</p>
                   <p class="text-white text-sm font-medium">{{ fmtDate(selectedInvoice.start_date) }}</p>
                 </div>
-                <div v-if="selectedInvoice.due_date" class="bg-white/[0.03] border border-white/6 rounded-2xl p-3">
+                <div v-if="selectedInvoice.due_date" class="bg-white/3 border border-white/6 rounded-2xl p-3">
                   <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Due</p>
                   <p class="text-sm font-medium" :class="isOverdue(selectedInvoice) ? 'text-red-400' : 'text-white'">{{ fmtDate(selectedInvoice.due_date) }}</p>
                 </div>
-                <div v-if="selectedInvoice.end_date" class="bg-white/[0.03] border border-white/6 rounded-2xl p-3">
+                <div v-if="selectedInvoice.end_date" class="bg-white/3 border border-white/6 rounded-2xl p-3">
                   <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Period End</p>
                   <p class="text-white text-sm font-medium">{{ fmtDate(selectedInvoice.end_date) }}</p>
                 </div>
@@ -677,7 +677,7 @@ onMounted(() => fetchData())
               <!-- Payment schedule (split) -->
               <div v-if="selectedInvoice.invoice_payment_schedule?.length">
                 <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-3">Payment Schedule</p>
-                <div class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden divide-y divide-white/5">
+                <div class="bg-white/3 border border-white/6 rounded-2xl overflow-hidden divide-y divide-white/5">
                   <div
                     v-for="installment in selectedInvoice.invoice_payment_schedule.sort((a: any, b: any) => a.position - b.position)"
                     :key="installment.id"
@@ -714,7 +714,7 @@ onMounted(() => fetchData())
               <!-- Line items -->
               <div v-if="selectedInvoice.invoice_items?.length">
                 <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-3">Line Items</p>
-                <div class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
+                <div class="bg-white/3 border border-white/6 rounded-2xl overflow-hidden">
                   <div class="grid grid-cols-12 gap-2 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-white/5">
                     <div class="col-span-6">Description</div>
                     <div class="col-span-2 text-right">Qty</div>
@@ -735,13 +735,13 @@ onMounted(() => fetchData())
               </div>
 
               <!-- Flat amount -->
-              <div v-else class="flex items-center justify-between bg-white/[0.03] border border-white/6 rounded-2xl p-4">
+              <div v-else class="flex items-center justify-between bg-white/3 border border-white/6 rounded-2xl p-4">
                 <p class="text-slate-400 font-medium text-sm">Amount</p>
                 <p class="text-white font-mono font-bold text-xl tabular-nums">{{ fmt(selectedInvoice.amount, selectedInvoice.currency) }}</p>
               </div>
 
               <!-- Notes -->
-              <div v-if="selectedInvoice.notes" class="bg-white/[0.03] border border-white/6 rounded-2xl p-4">
+              <div v-if="selectedInvoice.notes" class="bg-white/3 border border-white/6 rounded-2xl p-4">
                 <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Notes</p>
                 <p class="text-slate-300 text-sm leading-relaxed">{{ selectedInvoice.notes }}</p>
               </div>
@@ -803,7 +803,7 @@ onMounted(() => fetchData())
                 <div class="space-y-1.5">
                   <label class="block text-xs font-semibold text-slate-400">Client <span class="text-red-400">*</span></label>
                   <div class="relative">
-                    <select v-model="form.client_id" required class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+                    <select v-model="form.client_id" required class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
                       <option value="" disabled>Choose...</option>
                       <option v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
                     </select>
@@ -813,7 +813,7 @@ onMounted(() => fetchData())
                 <div v-if="clientProjects.length" class="space-y-1.5">
                   <label class="block text-xs font-semibold text-slate-400">Project</label>
                   <div class="relative">
-                    <select v-model="form.project_id" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+                    <select v-model="form.project_id" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
                       <option value="">None</option>
                       <option v-for="p in clientProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
                     </select>
@@ -825,7 +825,7 @@ onMounted(() => fetchData())
               <!-- Title -->
               <div class="space-y-1.5">
                 <label class="block text-xs font-semibold text-slate-400">Title</label>
-                <input v-model="form.title" type="text" placeholder="e.g. Q2 2026 Monthly Retainer" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
+                <input v-model="form.title" type="text" placeholder="e.g. Q2 2026 Monthly Retainer" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
               </div>
 
               <!-- Line items / flat toggle -->
@@ -842,9 +842,9 @@ onMounted(() => fetchData())
                   <div class="col-span-3 text-right">Rate</div>
                 </div>
                 <div v-for="(item, idx) in lineItems" :key="idx" class="grid grid-cols-12 gap-2 items-center">
-                  <input v-model="item.description" type="text" placeholder="Description" class="col-span-6 bg-white/[0.04] border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
-                  <input v-model.number="item.quantity" type="number" min="0.01" step="0.01" class="col-span-2 bg-white/[0.04] border border-white/8 rounded-xl px-2 py-2.5 text-sm text-white text-center focus:border-primary/50 focus:outline-none transition-all duration-150" />
-                  <input v-model.number="item.unit_rate" type="number" min="0" step="0.01" class="col-span-3 bg-white/[0.04] border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white text-right focus:border-primary/50 focus:outline-none font-mono transition-all duration-150" />
+                  <input v-model="item.description" type="text" placeholder="Description" class="col-span-6 bg-white/4 border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
+                  <input v-model.number="item.quantity" type="number" min="0.01" step="0.01" class="col-span-2 bg-white/4 border border-white/8 rounded-xl px-2 py-2.5 text-sm text-white text-center focus:border-primary/50 focus:outline-none transition-all duration-150" />
+                  <input v-model.number="item.unit_rate" type="number" min="0" step="0.01" class="col-span-3 bg-white/4 border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white text-right focus:border-primary/50 focus:outline-none font-mono transition-all duration-150" />
                   <button type="button" @click="removeLineItem(idx)" :disabled="lineItems.length === 1" class="col-span-1 flex items-center justify-center text-slate-600 hover:text-red-400 transition-colors disabled:opacity-20">
                     <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
                   </button>
@@ -862,12 +862,12 @@ onMounted(() => fetchData())
               <div v-else class="grid grid-cols-3 gap-3">
                 <div class="col-span-2 space-y-1.5">
                   <label class="block text-xs font-semibold text-slate-400">Amount</label>
-                  <input v-model.number="form.amount" type="number" min="0" step="0.01" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none font-mono transition-all duration-150" />
+                  <input v-model.number="form.amount" type="number" min="0" step="0.01" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none font-mono transition-all duration-150" />
                 </div>
                 <div class="space-y-1.5">
                   <label class="block text-xs font-semibold text-slate-400">Currency</label>
                   <div class="relative">
-                    <select v-model="form.currency" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+                    <select v-model="form.currency" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
                       <option value="NGN">NGN</option><option value="USD">USD</option><option value="GBP">GBP</option><option value="EUR">EUR</option>
                     </select>
                     <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
@@ -879,7 +879,7 @@ onMounted(() => fetchData())
               <div v-if="useLineItems" class="w-32 space-y-1.5">
                 <label class="block text-xs font-semibold text-slate-400">Currency</label>
                 <div class="relative">
-                  <select v-model="form.currency" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+                  <select v-model="form.currency" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
                     <option value="NGN">NGN</option><option value="USD">USD</option><option value="GBP">GBP</option><option value="EUR">EUR</option>
                   </select>
                   <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
@@ -897,20 +897,20 @@ onMounted(() => fetchData())
               </div>
 
               <!-- Split config -->
-              <div v-if="paymentStructure === 'split'" class="space-y-3 bg-white/[0.03] rounded-2xl p-4 border border-white/6">
+              <div v-if="paymentStructure === 'split'" class="space-y-3 bg-white/3 rounded-2xl p-4 border border-white/6">
                 <div class="flex items-center justify-between">
                   <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Payment Splits</p>
                   <span class="text-[10px] font-semibold" :class="splitsTotal === 100 ? 'text-emerald-400' : 'text-amber-400'">{{ splitsTotal }}% / 100%</span>
                 </div>
                 <p class="text-[10px] text-slate-600">Amounts calculated from total. Due dates offset from issue date.</p>
                 <div v-for="(split, idx) in paymentSplits" :key="idx" class="grid grid-cols-12 gap-2 items-center">
-                  <input v-model="split.label" type="text" placeholder="Label" class="col-span-4 bg-white/[0.04] border border-white/8 rounded-xl px-2.5 py-2 text-xs text-white focus:border-primary/50 focus:outline-none placeholder-slate-600 transition-all duration-150" />
+                  <input v-model="split.label" type="text" placeholder="Label" class="col-span-4 bg-white/4 border border-white/8 rounded-xl px-2.5 py-2 text-xs text-white focus:border-primary/50 focus:outline-none placeholder-slate-600 transition-all duration-150" />
                   <div class="col-span-3 relative">
-                    <input v-model.number="split.percentage" type="number" min="1" max="100" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-2.5 py-2 text-xs text-white text-right focus:border-primary/50 focus:outline-none transition-all duration-150 pr-5" />
+                    <input v-model.number="split.percentage" type="number" min="1" max="100" class="w-full bg-white/4 border border-white/8 rounded-xl px-2.5 py-2 text-xs text-white text-right focus:border-primary/50 focus:outline-none transition-all duration-150 pr-5" />
                     <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-[10px]">%</span>
                   </div>
                   <div class="col-span-4 relative">
-                    <input v-model.number="split.due_offset_days" type="number" min="0" placeholder="+days" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-2.5 py-2 text-xs text-white focus:border-primary/50 focus:outline-none placeholder-slate-600 transition-all duration-150" />
+                    <input v-model.number="split.due_offset_days" type="number" min="0" placeholder="+days" class="w-full bg-white/4 border border-white/8 rounded-xl px-2.5 py-2 text-xs text-white focus:border-primary/50 focus:outline-none placeholder-slate-600 transition-all duration-150" />
                   </div>
                   <button type="button" @click="removeSplit(idx)" :disabled="paymentSplits.length === 1" class="col-span-1 flex items-center justify-center text-slate-600 hover:text-red-400 transition-colors disabled:opacity-20">
                     <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
@@ -933,7 +933,7 @@ onMounted(() => fetchData())
                 <div class="space-y-1.5">
                   <label class="block text-xs font-semibold text-slate-400">Interval</label>
                   <div class="relative">
-                    <select v-model="recurringInterval" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+                    <select v-model="recurringInterval" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
                       <option value="weekly">Weekly</option>
                       <option value="monthly">Monthly</option>
                       <option value="quarterly">Quarterly</option>
@@ -944,7 +944,7 @@ onMounted(() => fetchData())
                 </div>
                 <div class="space-y-1.5">
                   <label class="block text-xs font-semibold text-slate-400">Cycles</label>
-                  <input v-model.number="recurringCycles" type="number" min="1" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
+                  <input v-model.number="recurringCycles" type="number" min="1" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
                 </div>
               </div>
 
@@ -952,28 +952,28 @@ onMounted(() => fetchData())
               <div class="grid grid-cols-3 gap-3">
                 <div class="space-y-1.5">
                   <label class="block text-xs font-semibold text-slate-400">Issue Date</label>
-                  <input v-model="form.start_date" type="date" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-3 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
+                  <input v-model="form.start_date" type="date" class="w-full bg-white/4 border border-white/8 rounded-xl px-3 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
                 </div>
                 <div class="space-y-1.5">
                   <label class="block text-xs font-semibold text-slate-400">Due Date</label>
-                  <input v-model="form.due_date" type="date" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-3 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
+                  <input v-model="form.due_date" type="date" class="w-full bg-white/4 border border-white/8 rounded-xl px-3 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
                 </div>
                 <div class="space-y-1.5">
                   <label class="block text-xs font-semibold text-slate-400">Period End</label>
-                  <input v-model="form.end_date" type="date" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-3 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
+                  <input v-model="form.end_date" type="date" class="w-full bg-white/4 border border-white/8 rounded-xl px-3 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
                 </div>
               </div>
 
               <!-- Payment link -->
               <div class="space-y-1.5">
                 <label class="block text-xs font-semibold text-slate-400">Paystack / Payment Link</label>
-                <input v-model="form.payment_link" type="url" placeholder="https://paystack.com/pay/..." class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
+                <input v-model="form.payment_link" type="url" placeholder="https://paystack.com/pay/..." class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
               </div>
 
               <!-- Notes -->
               <div class="space-y-1.5">
                 <label class="block text-xs font-semibold text-slate-400">Notes</label>
-                <textarea v-model="form.notes" rows="2" placeholder="Bank details, payment terms..." class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none transition-all duration-150"></textarea>
+                <textarea v-model="form.notes" rows="2" placeholder="Bank details, payment terms..." class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none transition-all duration-150"></textarea>
               </div>
 
               <!-- Actions -->

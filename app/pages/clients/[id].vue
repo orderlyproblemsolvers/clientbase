@@ -242,7 +242,7 @@ onMounted(() => fetchData())
         <!-- Contact -->
         <div
           v-if="clientData.contact_name"
-          class="col-span-2 sm:col-span-1 bg-white/[0.03] border border-white/6 rounded-2xl px-4 py-3.5 flex items-center gap-3 hover:bg-white/5 transition-colors duration-150"
+          class="col-span-2 sm:col-span-1 bg-white/3 border border-white/6 rounded-2xl px-4 py-3.5 flex items-center gap-3 hover:bg-white/5 transition-colors duration-150"
         >
           <div class="w-8 h-8 rounded-xl bg-slate-700/50 flex items-center justify-center shrink-0">
             <UIcon name="i-heroicons-user" class="w-4 h-4 text-slate-400" />
@@ -256,7 +256,7 @@ onMounted(() => fetchData())
         <!-- Email -->
         <div
           v-if="clientData.contact_email"
-          class="col-span-2 sm:col-span-1 bg-white/[0.03] border border-white/6 rounded-2xl px-4 py-3.5 flex items-center gap-3 hover:bg-white/5 transition-colors duration-150"
+          class="col-span-2 sm:col-span-1 bg-white/3 border border-white/6 rounded-2xl px-4 py-3.5 flex items-center gap-3 hover:bg-white/5 transition-colors duration-150"
         >
           <div class="w-8 h-8 rounded-xl bg-slate-700/50 flex items-center justify-center shrink-0">
             <UIcon name="i-heroicons-envelope" class="w-4 h-4 text-slate-400" />
@@ -275,7 +275,7 @@ onMounted(() => fetchData())
         <!-- Phone -->
         <div
           v-if="clientData.contact_phone"
-          class="col-span-2 sm:col-span-1 bg-white/[0.03] border border-white/6 rounded-2xl px-4 py-3.5 flex items-center gap-3 hover:bg-white/5 transition-colors duration-150"
+          class="col-span-2 sm:col-span-1 bg-white/3 border border-white/6 rounded-2xl px-4 py-3.5 flex items-center gap-3 hover:bg-white/5 transition-colors duration-150"
         >
           <div class="w-8 h-8 rounded-xl bg-slate-700/50 flex items-center justify-center shrink-0">
             <UIcon name="i-heroicons-phone" class="w-4 h-4 text-slate-400" />
@@ -292,7 +292,7 @@ onMounted(() => fetchData())
         </div>
 
         <!-- Active projects stat -->
-        <div class="bg-white/[0.03] border border-white/6 rounded-2xl px-4 py-3.5 flex items-center gap-3 hover:bg-white/5 transition-colors duration-150">
+        <div class="bg-white/3 border border-white/6 rounded-2xl px-4 py-3.5 flex items-center gap-3 hover:bg-white/5 transition-colors duration-150">
           <div class="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
             <UIcon name="i-heroicons-folder-open" class="w-4 h-4 text-primary" />
           </div>
@@ -346,7 +346,7 @@ onMounted(() => fetchData())
             v-for="p in projects"
             :key="p.id"
             :to="`/projects/${p.id}`"
-            class="group bg-white/[0.03] hover:bg-white/[0.055] border border-white/6 hover:border-white/10 rounded-2xl p-5 transition-all duration-200 block"
+            class="group bg-white/3 hover:bg-white/5.5 border border-white/6 hover:border-white/10 rounded-2xl p-5 transition-all duration-200 block"
           >
             <!-- Top row: status + arrow -->
             <div class="flex items-center justify-between mb-4">
@@ -422,7 +422,7 @@ onMounted(() => fetchData())
           @input="notesDirty = true"
           rows="6"
           placeholder="Add notes about this client — context, preferences, communication style, key decisions…"
-          class="w-full bg-white/[0.03] border border-white/6 rounded-2xl px-5 py-4 text-sm text-slate-300 placeholder-slate-600 focus:outline-none focus:border-primary/40 focus:bg-white/[0.04] transition-all duration-150 leading-relaxed resize-y"
+          class="w-full bg-white/3 border border-white/6 rounded-2xl px-5 py-4 text-sm text-slate-300 placeholder-slate-600 focus:outline-none focus:border-primary/40 focus:bg-white/[0.04] transition-all duration-150 leading-relaxed resize-y"
         ></textarea>
       </section>
 
@@ -432,7 +432,7 @@ onMounted(() => fetchData())
           <UIcon name="i-heroicons-exclamation-triangle" class="w-3.5 h-3.5" aria-hidden="true" />
           Danger Zone
         </p>
-        <div class="bg-red-500/[0.04] border border-red-500/10 rounded-2xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div class="bg-red-500/4 border border-red-500/10 rounded-2xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <p class="text-sm font-semibold text-white mb-0.5">Delete this client</p>
             <p class="text-xs text-slate-500 leading-relaxed">
@@ -511,7 +511,7 @@ onMounted(() => fetchData())
                     autofocus
                     required
                     placeholder="e.g. Website Redesign"
-                    class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:bg-white/[0.06] focus:outline-none transition-all duration-150"
+                    class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:bg-white/[0.06] focus:outline-none transition-all duration-150"
                   />
                 </div>
 
@@ -523,7 +523,7 @@ onMounted(() => fetchData())
                     v-model="newProject.description"
                     rows="3"
                     placeholder="Brief description of the project scope…"
-                    class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:bg-white/[0.06] focus:outline-none transition-all duration-150 resize-none leading-relaxed"
+                    class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:bg-white/[0.06] focus:outline-none transition-all duration-150 resize-none leading-relaxed"
                   ></textarea>
                 </div>
 
@@ -534,7 +534,7 @@ onMounted(() => fetchData())
                     <select
                       id="proj-status"
                       v-model="newProject.status"
-                      class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150"
+                      class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150"
                     >
                       <option value="lead">Lead</option>
                       <option value="proposal">Proposal</option>

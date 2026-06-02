@@ -107,152 +107,178 @@
       </div>
     </div>
 
-    <div v-if="showNewModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div @click="showNewModal = false" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
-      <div class="relative w-full max-w-lg bg-[#0e121e] border border-white/[0.08] rounded-xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-200">
+<!-- ── New Form Modal ─────────────────────────────────────────────────────── -->
+<div v-if="showNewModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div @click="showNewModal = false" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
 
-        <div class="p-4 border-b border-white/[0.06] bg-white/[0.01] flex items-center justify-between shrink-0">
-          <h2 class="text-sm font-medium text-white tracking-tight">Initiate Onboarding Vector</h2>
-          <button @click="showNewModal = false" class="text-slate-400 hover:text-white transition-colors">
-            <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
-          </button>
+  <div class="relative w-full max-w-md bg-[#0e121e] border border-white/[0.08] rounded-xl shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+      <div>
+        <h2 class="text-sm font-semibold text-white">New Onboarding Form</h2>
+        <p class="text-[11px] text-slate-500 mt-0.5">Collect a client brief before starting a project</p>
+      </div>
+      <button
+        @click="showNewModal = false"
+        class="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] transition-all"
+      >
+        <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="px-5 py-5 space-y-4">
+
+      <!-- Client — required, always first -->
+      <div>
+        <label class="block text-xs font-medium text-slate-300 mb-1.5">
+          Client
+          <span class="text-indigo-400 ml-0.5">*</span>
+        </label>
+        <div class="relative">
+          <select
+            v-model="newForm.client_id"
+            class="w-full bg-white/[0.03] border rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none appearance-none cursor-pointer transition-colors"
+            :class="newForm.client_id
+              ? 'border-white/[0.10] focus:border-indigo-500/60'
+              : 'border-white/[0.06] focus:border-indigo-500/60'"
+          >
+            <option value="" disabled class="bg-[#0e121e]">Select a client…</option>
+            <option v-for="c in clients" :key="c.id" :value="c.id" class="bg-[#0e121e]">
+              {{ c.name }}
+            </option>
+          </select>
+          <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
         </div>
+        <p v-if="clients.length === 0" class="text-[11px] text-amber-400/80 mt-1.5 flex items-center gap-1">
+          <UIcon name="i-heroicons-information-circle" class="w-3.5 h-3.5" />
+          No clients yet — <NuxtLink to="/" class="underline underline-offset-2">add one first</NuxtLink>
+        </p>
+      </div>
 
-        <div class="p-5 overflow-y-auto space-y-4">
+      <!-- Form title — required -->
+      <div>
+        <label class="block text-xs font-medium text-slate-300 mb-1.5">
+          Form title
+          <span class="text-indigo-400 ml-0.5">*</span>
+        </label>
+        <input
+          v-model="newForm.title"
+          type="text"
+          placeholder="e.g. Website Brief, Brand Identity Brief…"
+          class="w-full bg-white/[0.03] border border-white/[0.06] focus:border-indigo-500/60 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none transition-colors"
+        />
+      </div>
 
-          <div>
-            <label class="block text-[10px] uppercase font-semibold text-slate-400 tracking-wider mb-2">Base Architecture</label>
-            <div class="flex gap-1 bg-white/[0.03] p-1 rounded-lg border border-white/[0.05] mb-3">
-              <button 
-                type="button" 
-                @click="copyFromFormId = ''" 
-                :class="!copyFromFormId ? 'bg-white/[0.06] text-white' : 'text-slate-400 hover:text-slate-200'" 
-                class="flex-1 py-1 text-xs font-medium rounded transition-all"
-              >
-                Built-in Blueprints
-              </button>
-              <button 
-                type="button" 
-                @click="selectedTemplate = ''" 
-                :class="copyFromFormId !== '' && selectedTemplate === '' && forms.length ? 'bg-white/[0.06] text-white' : 'text-slate-400 hover:text-slate-200'" 
-                class="flex-1 py-1 text-xs font-medium rounded transition-all"
-              >
-                Historical Profiles
-              </button>
-            </div>
-
-            <div v-if="selectedTemplate !== '' || !copyFromFormId" class="grid grid-cols-2 gap-2 mb-2">
-              <button
-                type="button"
-                @click="selectedTemplate = ''; copyFromFormId = ''"
-                class="p-2.5 rounded-lg border text-left transition-all flex flex-col justify-between h-16"
-                :class="!selectedTemplate && !copyFromFormId ? 'bg-indigo-600/10 border-indigo-500/30 text-white' : 'bg-white/[0.02] border-white/[0.05] text-slate-400 hover:border-white/[0.12]'"
-              >
-                <UIcon name="i-heroicons-document" class="w-4 h-4" />
-                <p class="text-xs font-medium">Blank Grid Matrix</p>
-              </button>
-              <button
-                type="button"
-                v-for="tpl in FORM_TEMPLATES"
-                :key="tpl.name"
-                @click="selectedTemplate = tpl.name; copyFromFormId = ''; if (!newForm.title) newForm.title = tpl.name"
-                class="p-2.5 rounded-lg border text-left transition-all flex flex-col justify-between h-16"
-                :class="selectedTemplate === tpl.name ? 'bg-indigo-600/10 border-indigo-500/30 text-white' : 'bg-white/[0.02] border-white/[0.05] text-slate-400 hover:border-white/[0.12]'"
-              >
-                <UIcon :name="tpl.icon" class="w-4 h-4 text-slate-400" />
-                <div>
-                  <p class="text-xs font-medium truncate">{{ tpl.name }}</p>
-                  <p class="text-[9px] opacity-60">{{ tpl.fields.length }} variables</p>
-                </div>
-              </button>
-            </div>
-
-            <div v-if="forms.length && copyFromFormId !== ''" class="space-y-1.5">
-              <div class="max-h-32 overflow-y-auto space-y-1.5 border border-white/[0.05] rounded-lg p-1.5 bg-black/[0.1]">
-                <button
-                  type="button"
-                  v-for="f in forms"
-                  :key="f.id"
-                  @click="copyFromFormId = f.id; selectedTemplate = ''"
-                  class="w-full flex items-center gap-3 p-2 rounded border text-left transition-all"
-                  :class="copyFromFormId === f.id ? 'bg-indigo-600/10 border-indigo-500/30 text-white' : 'bg-transparent border-transparent text-slate-400 hover:bg-white/[0.02]'"
-                >
-                  <UIcon name="i-heroicons-document-duplicate" class="w-4 h-4 shrink-0 opacity-70" />
-                  <div class="min-w-0">
-                    <p class="text-xs font-medium truncate">{{ f.title }}</p>
-                    <p class="text-[9px] text-slate-500">{{ Array.isArray(f.fields) ? f.fields.length : 0 }} tracking nodes · {{ f.clients?.name || 'Unassigned' }}</p>
-                  </div>
-                </button>
-              </div>
-            </div>
+      <!-- Project link — optional, only shown when client has projects -->
+      <Transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="opacity-0 -translate-y-1"
+        enter-to-class="opacity-100 translate-y-0"
+      >
+        <div v-if="clientProjects.length > 0">
+          <label class="block text-xs font-medium text-slate-300 mb-1.5">
+            Link to a project
+            <span class="text-slate-500 font-normal ml-1">— optional</span>
+          </label>
+          <div class="relative">
+            <select
+              v-model="newForm.project_id"
+              class="w-full bg-white/[0.03] border border-white/[0.06] focus:border-indigo-500/60 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none appearance-none cursor-pointer transition-colors"
+            >
+              <option value="" class="bg-[#0e121e]">No project — I'll assign it later</option>
+              <option v-for="p in clientProjects" :key="p.id" :value="p.id" class="bg-[#0e121e]">
+                {{ p.name }}
+              </option>
+            </select>
+            <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
           </div>
+          <p class="text-[11px] text-slate-500 mt-1.5">
+            If none, a new project is created when the form is submitted.
+          </p>
+        </div>
+      </Transition>
 
-          <div>
-            <label class="block text-[10px] uppercase font-semibold text-slate-400 tracking-wider mb-1.5">
-              Target Entity Client <span class="text-indigo-400">*</span>
-            </label>
+      <!-- Description — optional -->
+      <div>
+        <label class="block text-xs font-medium text-slate-300 mb-1.5">
+          Description
+          <span class="text-slate-500 font-normal ml-1">— optional</span>
+        </label>
+        <textarea
+          v-model="newForm.description"
+          rows="2"
+          placeholder="A short note your client will see at the top of the form…"
+          class="w-full bg-white/[0.03] border border-white/[0.06] focus:border-indigo-500/60 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none resize-none transition-colors leading-relaxed"
+        ></textarea>
+      </div>
+
+      <!-- Copy from existing — optional, collapsed by default -->
+      <div v-if="forms.length > 0" class="border border-white/[0.05] rounded-lg overflow-hidden">
+        <button
+          type="button"
+          @click="showCopySection = !showCopySection"
+          class="w-full flex items-center justify-between px-3 py-2.5 text-xs text-slate-400 hover:text-white hover:bg-white/[0.03] transition-all"
+        >
+          <span class="flex items-center gap-2">
+            <UIcon name="i-heroicons-document-duplicate" class="w-3.5 h-3.5" />
+            Copy fields from a previous form
+          </span>
+          <UIcon
+            name="i-heroicons-chevron-down"
+            class="w-3.5 h-3.5 transition-transform duration-200"
+            :class="showCopySection ? 'rotate-180' : ''"
+          />
+        </button>
+
+        <Transition
+          enter-active-class="transition duration-200 ease-out"
+          enter-from-class="opacity-0"
+          enter-to-class="opacity-100"
+        >
+          <div v-if="showCopySection" class="px-3 pb-3 border-t border-white/[0.05] pt-3">
             <div class="relative">
               <select
-                v-model="newForm.client_id"
-                required
-                class="w-full bg-black/20 border border-white/[0.08] focus:border-indigo-500 rounded-lg px-3 py-2 text-white text-xs focus:outline-none appearance-none cursor-pointer"
+                v-model="copyFromFormId"
+                class="w-full bg-white/[0.03] border border-white/[0.06] focus:border-indigo-500/60 rounded-lg px-3 py-2.5 text-xs text-white focus:outline-none appearance-none cursor-pointer transition-colors"
               >
-                <option value="" disabled>Select administrative client workspace...</option>
-                <option v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
+                <option value="" class="bg-[#0e121e]">Pick a form to copy from…</option>
+                <option v-for="f in forms" :key="f.id" :value="f.id" class="bg-[#0e121e]">
+                  {{ f.title }} — {{ f.clients?.name || 'No client' }}
+                </option>
               </select>
-              <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-3.5 h-3.5 pointer-events-none" />
+              <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-3.5 h-3.5 pointer-events-none" />
             </div>
+            <p class="text-[11px] text-slate-500 mt-1.5">Only the fields are copied — not the responses.</p>
           </div>
-
-          <div v-if="clientProjects.length">
-            <label class="block text-[10px] uppercase font-semibold text-slate-400 tracking-wider mb-1.5">
-              Link operational project timeline (optional)
-            </label>
-            <div class="relative">
-              <select v-model="newForm.project_id" class="w-full bg-black/20 border border-white/[0.08] focus:border-indigo-500 rounded-lg px-3 py-2 text-white text-xs focus:outline-none appearance-none cursor-pointer">
-                <option value="">Do not link — configure isolated entry parameters</option>
-                <option v-for="p in clientProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
-              </select>
-              <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-3.5 h-3.5 pointer-events-none" />
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-[10px] uppercase font-semibold text-slate-400 tracking-wider mb-1.5">Form Framework Title <span class="text-indigo-400">*</span></label>
-            <input
-              v-model="newForm.title"
-              type="text"
-              placeholder="e.g., Strategic Operational Blueprint Intake"
-              class="w-full bg-black/20 border border-white/[0.08] focus:border-indigo-500 rounded-lg px-3 py-2 text-white text-xs focus:outline-none placeholder-slate-600"
-            />
-          </div>
-
-          <div>
-            <label class="block text-[10px] uppercase font-semibold text-slate-400 tracking-wider mb-1.5">Public Facing Directives & Context</label>
-            <textarea
-              v-model="newForm.description"
-              rows="2"
-              placeholder="Provide clean operational guidelines contextually visible to the recipient user matrix..."
-              class="w-full bg-black/20 border border-white/[0.08] focus:border-indigo-500 rounded-lg px-3 py-2 text-white text-xs focus:outline-none resize-none placeholder-slate-600"
-            ></textarea>
-          </div>
-
-          <div class="flex gap-2 pt-2 border-t border-white/[0.04]">
-            <button type="button" @click="showNewModal = false" class="flex-1 py-2 rounded-lg border border-white/[0.06] text-slate-400 hover:text-white text-xs font-medium transition-all">
-              Cancel
-            </button>
-            <button
-              @click="createForm"
-              :disabled="creating || !newForm.title.trim() || !newForm.client_id"
-              class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-xs font-medium transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"
-            >
-              <UIcon v-if="creating" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
-              <span v-else>Deploy Grid Matrix</span>
-            </button>
-          </div>
-        </div>
+        </Transition>
       </div>
+
     </div>
+
+    <!-- Footer -->
+    <div class="px-5 pb-5 flex items-center gap-2.5">
+      <button
+        type="button"
+        @click="showNewModal = false"
+        class="flex-1 py-2.5 rounded-lg border border-white/[0.07] text-slate-400 hover:text-white hover:border-white/[0.14] text-xs font-medium transition-all"
+      >
+        Cancel
+      </button>
+      <button
+        @click="createForm"
+        :disabled="creating || !newForm.title.trim() || !newForm.client_id"
+        class="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-900/30"
+      >
+        <UIcon v-if="creating" name="i-heroicons-arrow-path" class="w-3.5 h-3.5 animate-spin" />
+        <UIcon v-else name="i-heroicons-arrow-right" class="w-3.5 h-3.5" />
+        {{ creating ? 'Creating…' : 'Create Form' }}
+      </button>
+    </div>
+
+  </div>
+</div>
 
     <Transition 
       enter-active-class="transform ease-out duration-200 transition" 
@@ -292,6 +318,7 @@ const newForm = ref({ title: '', description: '', client_id: '', project_id: '' 
 
 const clients  = ref([])
 const projects = ref([])
+const showCopySection = ref(false)
 
 const showToast = (msg, type = 'success') => {
   toast.value = { show: true, message: msg, type }
@@ -369,6 +396,7 @@ const createForm = async () => {
     if (error) throw error
 
     showNewModal.value  = false
+    showCopySection.value = false
     newForm.value       = { title: '', description: '', client_id: '', project_id: '' }
     selectedTemplate.value = ''
     copyFromFormId.value   = ''

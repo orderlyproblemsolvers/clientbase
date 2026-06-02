@@ -267,15 +267,15 @@ const applyToRecord = async (responses: Record<string, any>, subId: string) => {
     const { data: newProj, error } = await supabase
       .from('projects')
       .insert({
-        client_id:               formData.value.client_id,
-        user_id:                 userId,
-        name:                    projectName,
-        description:             description  || null,
-        budget:                  budget       || null,
-        end_date:                endDate      || null,
-        start_date:              startDate    || null,
-        status:                  'active',
-        currency:                'NGN',
+        client_id: formData.value.client_id,
+        user_id:  userId,
+        name:   projectName,
+        description: description  || null,
+        budget:    budget  || null,
+        end_date:   endDate  || null,
+        start_date: startDate  || null,
+        status: 'active',
+        currency:  'NGN',
         onboarding_submission_id: subId,
       })
       .select()
@@ -423,12 +423,12 @@ onMounted(() => fetchData())
       <div v-if="activeTab === 'build'" class="space-y-6">
 
         <!-- Form meta -->
-        <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-5 space-y-4">
+        <div class="bg-white/3 border border-white/6 rounded-2xl p-5 space-y-4">
           <h3 class="text-sm font-semibold text-white">Form Settings</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="space-y-1.5">
               <label for="form-title" class="block text-xs font-semibold text-slate-400">Title</label>
-              <input id="form-title" v-model="formData.title" type="text" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
+              <input id="form-title" v-model="formData.title" type="text" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
             </div>
             <div class="space-y-1.5">
               <label for="form-desc" class="block text-xs font-semibold text-slate-400">Description (visible to client)</label>
@@ -437,9 +437,9 @@ onMounted(() => fetchData())
             <div class="space-y-1.5">
               <label for="form-client" class="block text-xs font-semibold text-slate-400">Linked Client</label>
               <div class="relative">
-                <select id="form-client" v-model="formData.client_id" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
-                  <option value="">None</option>
-                  <option v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
+                <select id="form-client" v-model="formData.client_id" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+                  <option class="bg-black hover:bg-gray-900" value="">None</option>
+                  <option class="bg-black hover:bg-gray-900" v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
                 <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
               </div>
@@ -447,9 +447,9 @@ onMounted(() => fetchData())
             <div class="space-y-1.5">
               <label for="form-project" class="block text-xs font-semibold text-slate-400">Linked Project</label>
               <div class="relative">
-                <select id="form-project" v-model="formData.project_id" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
-                  <option value="">None</option>
-                  <option v-for="p in clientProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
+                <select id="form-project" v-model="formData.project_id" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+                  <option class="bg-black hover:bg-gray-900" value="">None</option>
+                  <option class="bg-black hover:bg-gray-900" v-for="p in clientProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
                 </select>
                 <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
               </div>
@@ -458,7 +458,7 @@ onMounted(() => fetchData())
         </div>
 
         <!-- Fields -->
-        <div class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
+        <div class="bg-white/3 border border-white/6 rounded-2xl overflow-hidden">
           <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
             <h3 class="text-sm font-semibold text-white">
               Fields
@@ -487,7 +487,7 @@ onMounted(() => fetchData())
             <div
               v-for="(field, idx) in fields"
               :key="field.id"
-              class="flex items-center gap-4 px-5 py-3.5 hover:bg-white/[0.03] transition-colors duration-150 group"
+              class="flex items-center gap-4 px-5 py-3.5 hover:bg-white/3 transition-colors duration-150 group"
             >
               <!-- Type icon -->
               <div class="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
@@ -568,11 +568,11 @@ onMounted(() => fetchData())
                 v-model="fillAnswers[field.id]"
                 :placeholder="field.placeholder"
                 rows="4"
-                class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none transition-all duration-150"
+                class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none transition-all duration-150"
               ></textarea>
 
               <div v-else-if="field.type === 'select'" class="relative">
-                <select v-model="fillAnswers[field.id]" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+                <select v-model="fillAnswers[field.id]" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
                   <option value="">Select...</option>
                   <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
                 </select>
@@ -584,7 +584,7 @@ onMounted(() => fetchData())
                 v-model="fillAnswers[field.id]"
                 :type="field.type === 'file' ? 'url' : field.type"
                 :placeholder="field.type === 'file' ? 'Paste file/drive link here' : field.placeholder"
-                class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150"
+                class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150"
               />
             </div>
 
@@ -605,14 +605,14 @@ onMounted(() => fetchData())
       <!-- ── SHARE TAB ───────────────────────────────────────────────────── -->
       <div v-else-if="activeTab === 'share'" class="animate-in fade-in duration-300 max-w-xl space-y-6">
 
-        <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-6 space-y-4">
+        <div class="bg-white/3 border border-white/6 rounded-2xl p-6 space-y-4">
           <h3 class="text-sm font-semibold text-white">Client Link</h3>
           <p class="text-slate-400 text-sm">
             Share this link with your client. They can fill the form without creating a ClientBase account.
           </p>
 
           <!-- Link display -->
-          <div class="flex items-center gap-3 bg-white/[0.04] rounded-xl p-3 border border-white/8">
+          <div class="flex items-center gap-3 bg-white/4 rounded-xl p-3 border border-white/8">
             <p class="flex-1 text-slate-300 text-sm font-mono truncate">{{ clientLink }}</p>
             <button
               @click="copyClientLink"
@@ -647,7 +647,7 @@ onMounted(() => fetchData())
         </div>
 
         <!-- Preview link -->
-        <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-6">
+        <div class="bg-white/3 border border-white/6 rounded-2xl p-6">
           <h3 class="text-sm font-semibold text-white mb-2">Preview as Client</h3>
           <p class="text-slate-500 text-sm mb-4">See exactly what your client will see when they open the link.</p>
           <a
@@ -676,7 +676,7 @@ onMounted(() => fetchData())
           <div
             v-for="sub in submissions"
             :key="sub.id"
-            class="bg-white/[0.03] border border-white/6 hover:border-white/10 rounded-2xl p-5 transition-all duration-150"
+            class="bg-white/3 border border-white/6 hover:border-white/10 rounded-2xl p-5 transition-all duration-150"
           >
             <div class="flex items-start justify-between mb-4">
               <div>
@@ -699,10 +699,10 @@ onMounted(() => fetchData())
               <div
                 v-for="field in fields"
                 :key="field.id"
-                class="bg-white/[0.04] rounded-xl p-3"
+                class="bg-white/4 rounded-xl p-3"
               >
                 <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">{{ field.label }}</p>
-                <p class="text-slate-300 text-sm break-words">
+                <p class="text-slate-300 text-sm wrap-break-word">
                   {{ sub.responses[field.id] || '—' }}
                 </p>
               </div>
@@ -768,13 +768,13 @@ onMounted(() => fetchData())
                 <!-- Label -->
                 <div class="space-y-1.5">
                   <label for="field-label" class="block text-xs font-semibold text-slate-400">Label <span class="text-red-400">*</span></label>
-                  <input id="field-label" v-model="fieldDraft.label" type="text" placeholder="e.g. Budget, Company Name..." class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
+                  <input id="field-label" v-model="fieldDraft.label" type="text" placeholder="e.g. Budget, Company Name..." class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
                 </div>
 
                 <!-- Placeholder -->
                 <div class="space-y-1.5">
                   <label for="field-placeholder" class="block text-xs font-semibold text-slate-400">Placeholder</label>
-                  <input id="field-placeholder" v-model="fieldDraft.placeholder" type="text" placeholder="Hint shown inside the field..." class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
+                  <input id="field-placeholder" v-model="fieldDraft.placeholder" type="text" placeholder="Hint shown inside the field..." class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
                 </div>
 
                 <!-- Options (select only) -->
@@ -782,7 +782,7 @@ onMounted(() => fetchData())
                   <label class="block text-xs font-semibold text-slate-400">Options</label>
                   <div class="space-y-2">
                     <div v-for="(opt, i) in fieldDraft.options" :key="i" class="flex items-center gap-2">
-                      <span class="flex-1 bg-white/[0.04] px-3 py-2 rounded-xl text-white text-sm">{{ opt }}</span>
+                      <span class="flex-1 bg-white/4 px-3 py-2 rounded-xl text-white text-sm">{{ opt }}</span>
                       <button type="button" @click="removeOption(i)" class="p-1.5 rounded-lg text-slate-600 hover:text-red-400 transition-colors">
                         <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
                       </button>
@@ -793,7 +793,7 @@ onMounted(() => fetchData())
                       v-model="optionInput"
                       type="text"
                       placeholder="Add option..."
-                      class="flex-1 bg-white/[0.04] border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150"
+                      class="flex-1 bg-white/4 border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150"
                       @keydown.enter.prevent="addOption"
                     />
                     <button type="button" @click="addOption" class="px-3 py-2.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/8 border border-white/6 text-slate-400 hover:text-white transition-all">

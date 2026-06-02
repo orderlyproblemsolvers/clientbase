@@ -238,7 +238,7 @@ onMounted(() => fetchTemplates())
         <div
           v-for="t in templates"
           :key="t.id"
-          class="bg-white/[0.03] border border-white/6 hover:border-white/10 rounded-2xl p-5 transition-all duration-150"
+          class="bg-white/3 border border-white/6 hover:border-white/10 rounded-2xl p-5 transition-all duration-150"
         >
           <div class="flex items-start justify-between mb-4">
             <div class="flex items-center gap-3">
@@ -303,12 +303,12 @@ onMounted(() => fetchTemplates())
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-1.5">
             <label for="template-name" class="block text-xs font-semibold text-slate-400">Template Name <span class="text-red-400">*</span></label>
-            <input id="template-name" v-model="form.name" type="text" placeholder="e.g. Retainer Basic" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
+            <input id="template-name" v-model="form.name" type="text" placeholder="e.g. Retainer Basic" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
           </div>
           <div class="space-y-1.5">
             <label for="template-type" class="block text-xs font-semibold text-slate-400">Project Type</label>
             <div class="relative">
-              <select id="template-type" v-model="form.project_type" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+              <select id="template-type" v-model="form.project_type" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
                 <option v-for="t in PROJECT_TYPES" :key="t" :value="t">{{ t }}</option>
               </select>
               <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
@@ -320,7 +320,7 @@ onMounted(() => fetchTemplates())
         <div class="w-32 space-y-1.5">
           <label for="template-currency" class="block text-xs font-semibold text-slate-400">Default Currency</label>
           <div class="relative">
-            <select id="template-currency" v-model="form.default_currency" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+            <select id="template-currency" v-model="form.default_currency" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
               <option value="NGN">NGN</option>
               <option value="USD">USD</option>
               <option value="GBP">GBP</option>
@@ -339,13 +339,13 @@ onMounted(() => fetchTemplates())
                 v-model="item.description"
                 type="text"
                 placeholder="e.g. Monthly support"
-                class="flex-1 bg-white/[0.04] border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150"
+                class="flex-1 bg-white/4 border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150"
               />
               <input
                 v-model.number="item.quantity"
                 type="number"
                 min="1"
-                class="w-16 bg-white/[0.04] border border-white/8 rounded-xl px-2 py-2.5 text-sm text-white text-center focus:border-primary/50 focus:outline-none transition-all duration-150"
+                class="w-16 bg-white/4 border border-white/8 rounded-xl px-2 py-2.5 text-sm text-white text-center focus:border-primary/50 focus:outline-none transition-all duration-150"
               />
               <button
                 type="button"
@@ -388,7 +388,7 @@ onMounted(() => fetchTemplates())
         </div>
 
         <!-- Split config -->
-        <div v-if="form.payment_structure === 'split'" class="space-y-3 bg-white/[0.03] rounded-2xl p-4 border border-white/6">
+        <div v-if="form.payment_structure === 'split'" class="space-y-3 bg-white/3 rounded-2xl p-4 border border-white/6">
           <div class="flex items-center justify-between">
             <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Payment Splits</p>
             <span
@@ -404,7 +404,7 @@ onMounted(() => fetchTemplates())
               v-model="split.label"
               type="text"
               placeholder="Label"
-              class="col-span-4 bg-white/[0.04] border border-white/8 rounded-xl px-2.5 py-2 text-xs text-white focus:border-primary/50 focus:outline-none placeholder-slate-600 transition-all duration-150"
+              class="col-span-4 bg-white/4 border border-white/8 rounded-xl px-2.5 py-2 text-xs text-white focus:border-primary/50 focus:outline-none placeholder-slate-600 transition-all duration-150"
             />
             <div class="col-span-3 relative">
               <input
@@ -412,7 +412,7 @@ onMounted(() => fetchTemplates())
                 type="number"
                 min="1"
                 max="100"
-                class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-2.5 py-2 text-xs text-white text-right focus:border-primary/50 focus:outline-none transition-all duration-150 pr-5"
+                class="w-full bg-white/4 border border-white/8 rounded-xl px-2.5 py-2 text-xs text-white text-right focus:border-primary/50 focus:outline-none transition-all duration-150 pr-5"
               />
               <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-[10px]">%</span>
             </div>
@@ -421,7 +421,7 @@ onMounted(() => fetchTemplates())
                 v-model.number="split.due_offset_days"
                 type="number"
                 min="0"
-                class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-2.5 py-2 text-xs text-white focus:border-primary/50 focus:outline-none placeholder-slate-600 transition-all duration-150"
+                class="w-full bg-white/4 border border-white/8 rounded-xl px-2.5 py-2 text-xs text-white focus:border-primary/50 focus:outline-none placeholder-slate-600 transition-all duration-150"
                 placeholder="+days"
               />
             </div>
@@ -447,7 +447,7 @@ onMounted(() => fetchTemplates())
           <div class="space-y-1.5">
             <label class="block text-xs font-semibold text-slate-400">Interval</label>
             <div class="relative">
-              <select v-model="form.recurring_interval" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+              <select v-model="form.recurring_interval" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
                 <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
                 <option value="quarterly">Quarterly</option>
@@ -458,14 +458,14 @@ onMounted(() => fetchTemplates())
           </div>
           <div class="space-y-1.5">
             <label class="block text-xs font-semibold text-slate-400">Cycles</label>
-            <input v-model.number="form.recurring_cycles" type="number" min="1" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
+            <input v-model.number="form.recurring_cycles" type="number" min="1" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
           </div>
         </div>
 
         <!-- Notes -->
         <div class="space-y-1.5">
           <label class="block text-xs font-semibold text-slate-400">Default Notes</label>
-          <textarea v-model="form.default_notes" rows="3" placeholder="Bank details, payment terms..." class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none transition-all duration-150"></textarea>
+          <textarea v-model="form.default_notes" rows="3" placeholder="Bank details, payment terms..." class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none transition-all duration-150"></textarea>
         </div>
       </div>
 

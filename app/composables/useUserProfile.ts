@@ -15,38 +15,38 @@ export const useUserProfile = () => {
   // 1. Fetch Logic
   const fetch = async () => {
     // --- 🛡️ ID RECOVERY LOGIC 🛡️ ---
-    
-    // Start by trying the reactive user object
     let userId = user.value?.id
 
-    // If that fails (is null, undefined, or the string "undefined"), try Plan B
     if (!userId || typeof userId !== 'string' || userId === 'undefined') {
-       const { data } = await supabase.auth.getSession()
-       
-       if (data.session?.user?.id) {
-         userId = data.session.user.id
-       } else {
-         return
-       }
+      const { data } = await supabase.auth.getSession()
+      if (data.session?.user?.id) {
+        userId = data.session.user.id
+      } else {
+        // No session, don't attempt fetch
+        return
+      }
     }
 
-    // --- STANDARD GUARDS ---
-
-    // Don't fetch if already busy
+    // --- GUARDS ---
     if (profile.value.loading) return
-
-    // Don't fetch if we already have data (remove this line if you want to force refresh)
     if (profile.value.fetched && profile.value.full_name) return
 
-    // --- FETCH EXECUTION ---
+    // --- SAFETY TIMEOUT (prevents infinite spinner) ---
+    const SAFETY_TIMEOUT = 8000  // 8 seconds
+    let timer: ReturnType<typeof setTimeout> | null = null
 
     profile.value.loading = true
 
     try {
+      timer = setTimeout(() => {
+        console.warn('Profile fetch timed out — resetting loading')
+        profile.value.loading = false
+      }, SAFETY_TIMEOUT)
+
       const { data, error } = await supabase
         .from('profiles')
         .select('full_name, role, avatar_url')
-        .eq('id', userId) // <--- uses the recovered userId variable
+        .eq('id', userId)
         .single()
 
       if (error) throw error
@@ -63,6 +63,7 @@ export const useUserProfile = () => {
     } catch (e: any) {
       console.error('❌ Profile fetch failed:', e.message)
     } finally {
+      if (timer) clearTimeout(timer)
       profile.value.loading = false
     }
   }

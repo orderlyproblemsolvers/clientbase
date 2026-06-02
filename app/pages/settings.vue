@@ -230,7 +230,7 @@ onMounted(() => {
     <div class="max-w-6xl mx-auto flex flex-col lg:flex-row gap-8">
       
       <!-- Sidebar navigation -->
-      <aside class="w-full lg:w-64 flex-shrink-0">
+      <aside class="w-full lg:w-64 shrink-0">
         <nav class="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible pb-4 lg:pb-0 bg-white/5 p-1 rounded-xl">
           <button 
             @click="activeTab = 'profile'"
@@ -292,7 +292,7 @@ onMounted(() => {
         <div v-else-if="activeTab === 'profile'" class="max-w-2xl space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
           
           <!-- Avatar section -->
-          <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-6 flex flex-col sm:flex-row items-center gap-6">
+          <div class="bg-white/3 border border-white/6 rounded-2xl p-6 flex flex-col sm:flex-row items-center gap-6">
             <div class="relative group cursor-pointer shrink-0">
               <div 
                 class="w-24 h-24 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center text-3xl font-bold text-primary overflow-hidden"
@@ -316,7 +316,7 @@ onMounted(() => {
           </div>
 
           <!-- Personal information -->
-          <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-6">
+          <div class="bg-white/3 border border-white/6 rounded-2xl p-6">
             <h3 class="text-base font-semibold text-white mb-6 flex items-center gap-2">
               <UIcon name="i-heroicons-identification" class="w-5 h-5 text-slate-400" />
               Personal Information
@@ -325,11 +325,11 @@ onMounted(() => {
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="space-y-1.5">
                   <label class="block text-xs font-semibold text-slate-400">Full Name</label>
-                  <input v-model="profile.full_name" type="text" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
+                  <input v-model="profile.full_name" type="text" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
                 </div>
                 <div class="space-y-1.5">
                   <label class="block text-xs font-semibold text-slate-400">Role / Title</label>
-                  <input v-model="profile.role" type="text" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
+                  <input v-model="profile.role" type="text" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
                 </div>
               </div>
               <div class="flex justify-end pt-4 border-t border-white/5">
@@ -344,7 +344,7 @@ onMounted(() => {
 
         <!-- APPEARANCE TAB -->
         <div v-else-if="activeTab === 'appearance'" class="max-w-2xl space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-          <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-6">
+          <div class="bg-white/3 border border-white/6 rounded-2xl p-6">
             <h3 class="text-base font-semibold text-white mb-2">Interface Theme</h3>
             <p class="text-slate-400 text-sm mb-6">Select your preferred accent color for the dashboard.</p>
             
@@ -354,7 +354,7 @@ onMounted(() => {
                 :key="t.hex"
                 @click="setTheme(t.hex)"
                 class="group relative flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all hover:scale-105"
-                :class="activeTheme === t.hex ? 'bg-white/[0.05] border-primary shadow-lg shadow-primary/10' : 'bg-white/[0.03] border-white/6 hover:border-white/10'"
+                :class="activeTheme === t.hex ? 'bg-white/5 border-primary shadow-lg shadow-primary/10' : 'bg-white/3 border-white/6 hover:border-white/10'"
               >
                 <div 
                   class="w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-transform group-hover:rotate-12"
@@ -372,7 +372,7 @@ onMounted(() => {
         <div v-else-if="activeTab === 'security'" class="max-w-2xl space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
           
           <!-- Change Password -->
-          <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-6">
+          <div class="bg-white/3 border border-white/6 rounded-2xl p-6">
             <h3 class="text-base font-semibold text-white mb-6 flex items-center gap-2">
                <UIcon name="i-heroicons-key" class="w-5 h-5 text-slate-400" />
                Change Password
@@ -381,12 +381,12 @@ onMounted(() => {
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="space-y-1.5">
                   <label class="block text-xs font-semibold text-slate-400">New Password</label>
-                  <input v-model="passwordForm.new_password" type="password" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
+                  <input v-model="passwordForm.new_password" type="password" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
                 </div>
                 <div class="space-y-1.5">
                   <label class="block text-xs font-semibold text-slate-400">Confirm Password</label>
                   <div class="relative">
-                    <input v-model="passwordForm.confirm_password" type="password" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
+                    <input v-model="passwordForm.confirm_password" type="password" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
                     <div v-if="passwordForm.confirm_password" class="absolute right-3.5 top-1/2 -translate-y-1/2">
                       <UIcon v-if="passwordForm.new_password === passwordForm.confirm_password" name="i-heroicons-check-circle" class="w-5 h-5 text-emerald-400" />
                       <UIcon v-else name="i-heroicons-exclamation-circle" class="w-5 h-5 text-red-400" />
@@ -403,7 +403,7 @@ onMounted(() => {
           </div>
 
           <!-- Logout of all devices -->
-          <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div class="bg-white/3 border border-white/6 rounded-2xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
              <div>
                 <h3 class="text-sm font-semibold text-white">Log out of all devices</h3>
                 <p class="text-slate-500 text-xs mt-1">This will sign you out of all active sessions except this one.</p>

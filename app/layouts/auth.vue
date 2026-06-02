@@ -9,7 +9,7 @@
         class="absolute inset-0 w-full h-full object-cover opacity-90"
       />
       
-      <div class="absolute inset-0 bg-gradient-to-t from-base/90 via-base/20 to-transparent"></div>
+      <div class="absolute inset-0 bg-linear-to-t from-base/90 via-base/20 to-transparent"></div>
 
       <div class="absolute bottom-12 left-12 right-12 max-w-md p-8 bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl">
         <div class="flex items-center gap-3 mb-4">
