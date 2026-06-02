@@ -20,7 +20,7 @@ export const useAuthStore = defineStore('auth', {
 
         if (error) throw error
         
-        // --- THE CLEANER FIX ---
+
         // Instead of forcing the value, we politely wait for 
         // Nuxt's reactivity system to catch up with Supabase.
         

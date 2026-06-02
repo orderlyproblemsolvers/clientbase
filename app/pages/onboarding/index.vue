@@ -1,0 +1,414 @@
+<template>
+  <div class="min-h-screen  animate-in fade-in duration-300">
+
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 pb-5 border-b border-white/[0.04]">
+      <div>
+        <h1 class="text-2xl font-semibold text-white tracking-tight flex items-center gap-2.5">
+          <UIcon name="i-heroicons-clipboard-document-list" class="w-6 h-6 text-indigo-400" />
+          Client Onboarding
+        </h1>
+        <p class="text-slate-400 mt-1 text-xs tracking-wide">
+          Deploy structured intake forms to collect client requirements, briefs, and legal details.
+        </p>
+      </div>
+      <button
+        @click="showNewModal = true"
+        class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-4 py-2 rounded-lg transition-all shadow-sm flex items-center gap-1.5 self-stretch sm:self-auto justify-center"
+      >
+        <UIcon name="i-heroicons-plus" class="w-4 h-4" />
+        New Form
+      </button>
+    </div>
+
+    <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div v-for="i in 3" :key="i" class="h-48 bg-white/[0.02] border border-white/[0.04] rounded-xl animate-pulse"></div>
+    </div>
+
+    <div v-else-if="forms.length === 0" class="text-center py-20 border border-dashed border-white/[0.06] rounded-xl bg-white/[0.01]">
+      <div class="w-12 h-12 bg-white/[0.03] border border-white/[0.06] rounded-lg flex items-center justify-center mx-auto mb-4">
+        <UIcon name="i-heroicons-clipboard-document-list" class="w-5 h-5 text-slate-500" />
+      </div>
+      <p class="text-white font-medium text-sm">No onboarding profiles found</p>
+      <p class="text-slate-500 text-xs mt-1 mb-5 max-w-xs mx-auto">Create specialized onboarding frameworks to streamline early-stage client communications.</p>
+      <button @click="showNewModal = true" class="text-indigo-400 hover:text-indigo-300 text-xs font-medium transition-colors">
+        + Provision initial entry form
+      </button>
+    </div>
+
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div
+        v-for="f in forms"
+        :key="f.id"
+        class="bg-white/[0.01] border border-white/[0.05] hover:border-white/[0.12] rounded-xl p-5 transition-all group flex flex-col justify-between"
+      >
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <span
+              class="px-2 py-0.5 rounded text-[10px] tracking-wider uppercase font-semibold border flex items-center gap-1.5"
+              :class="statusConfig[f.status]?.color"
+            >
+              <span class="w-1.5 h-1.5 rounded-full" :class="statusConfig[f.status]?.dot"></span>
+              {{ statusConfig[f.status]?.label }}
+            </span>
+            <div class="flex items-center gap-0.5">
+              <button
+                v-if="f.status !== 'draft'"
+                @click="copyLink(f.token)"
+                class="p-1.5 rounded text-slate-400 hover:text-indigo-400 hover:bg-white/[0.04] transition-colors"
+                title="Copy pipeline URL"
+              >
+                <UIcon name="i-heroicons-link" class="w-4 h-4" />
+              </button>
+              <button
+                @click="deleteForm(f.id)"
+                class="p-1.5 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                title="Purge form profile"
+              >
+                <UIcon name="i-heroicons-trash" class="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <NuxtLink :to="`/onboarding/${f.id}`" class="block group-hover:translate-x-0.5 transition-transform">
+            <h3 class="text-white font-medium text-sm mb-1 group-hover:text-indigo-400 transition-colors truncate">
+              {{ f.title }}
+            </h3>
+          </NuxtLink>
+
+          <p v-if="f.description" class="text-slate-400 text-xs line-clamp-2 mb-4 leading-relaxed">
+            {{ f.description }}
+          </p>
+        </div>
+
+        <div>
+          <div class="flex items-center gap-3 text-[10px] text-slate-500 border-t border-white/[0.04] pt-3 flex-wrap">
+            <span v-if="f.clients?.name" class="flex items-center gap-1 max-w-[120px] truncate">
+              <UIcon name="i-heroicons-building-office-2" class="w-3.5 h-3.5 opacity-70 shrink-0" />
+              {{ f.clients.name }}
+            </span>
+            <span v-if="f.projects?.name" class="flex items-center gap-1 max-w-[120px] truncate">
+              <UIcon name="i-heroicons-folder-open" class="w-3.5 h-3.5 opacity-70 shrink-0" />
+              {{ f.projects.name }}
+            </span>
+            <span class="flex items-center gap-1">
+              <UIcon name="i-heroicons-rectangle-stack" class="w-3.5 h-3.5 opacity-70" />
+              {{ Array.isArray(f.fields) ? f.fields.length : 0 }} metrics
+            </span>
+          </div>
+
+          <NuxtLink
+            :to="`/onboarding/${f.id}`"
+            class="mt-4 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] text-slate-300 hover:text-white text-xs font-medium transition-all border border-white/[0.04]"
+          >
+            <UIcon name="i-heroicons-pencil-square" class="w-3.5 h-3.5" />
+            Open Editor Architecture
+          </NuxtLink>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showNewModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div @click="showNewModal = false" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+      <div class="relative w-full max-w-lg bg-[#0e121e] border border-white/[0.08] rounded-xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-200">
+
+        <div class="p-4 border-b border-white/[0.06] bg-white/[0.01] flex items-center justify-between shrink-0">
+          <h2 class="text-sm font-medium text-white tracking-tight">Initiate Onboarding Vector</h2>
+          <button @click="showNewModal = false" class="text-slate-400 hover:text-white transition-colors">
+            <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
+          </button>
+        </div>
+
+        <div class="p-5 overflow-y-auto space-y-4">
+
+          <div>
+            <label class="block text-[10px] uppercase font-semibold text-slate-400 tracking-wider mb-2">Base Architecture</label>
+            <div class="flex gap-1 bg-white/[0.03] p-1 rounded-lg border border-white/[0.05] mb-3">
+              <button 
+                type="button" 
+                @click="copyFromFormId = ''" 
+                :class="!copyFromFormId ? 'bg-white/[0.06] text-white' : 'text-slate-400 hover:text-slate-200'" 
+                class="flex-1 py-1 text-xs font-medium rounded transition-all"
+              >
+                Built-in Blueprints
+              </button>
+              <button 
+                type="button" 
+                @click="selectedTemplate = ''" 
+                :class="copyFromFormId !== '' && selectedTemplate === '' && forms.length ? 'bg-white/[0.06] text-white' : 'text-slate-400 hover:text-slate-200'" 
+                class="flex-1 py-1 text-xs font-medium rounded transition-all"
+              >
+                Historical Profiles
+              </button>
+            </div>
+
+            <div v-if="selectedTemplate !== '' || !copyFromFormId" class="grid grid-cols-2 gap-2 mb-2">
+              <button
+                type="button"
+                @click="selectedTemplate = ''; copyFromFormId = ''"
+                class="p-2.5 rounded-lg border text-left transition-all flex flex-col justify-between h-16"
+                :class="!selectedTemplate && !copyFromFormId ? 'bg-indigo-600/10 border-indigo-500/30 text-white' : 'bg-white/[0.02] border-white/[0.05] text-slate-400 hover:border-white/[0.12]'"
+              >
+                <UIcon name="i-heroicons-document" class="w-4 h-4" />
+                <p class="text-xs font-medium">Blank Grid Matrix</p>
+              </button>
+              <button
+                type="button"
+                v-for="tpl in FORM_TEMPLATES"
+                :key="tpl.name"
+                @click="selectedTemplate = tpl.name; copyFromFormId = ''; if (!newForm.title) newForm.title = tpl.name"
+                class="p-2.5 rounded-lg border text-left transition-all flex flex-col justify-between h-16"
+                :class="selectedTemplate === tpl.name ? 'bg-indigo-600/10 border-indigo-500/30 text-white' : 'bg-white/[0.02] border-white/[0.05] text-slate-400 hover:border-white/[0.12]'"
+              >
+                <UIcon :name="tpl.icon" class="w-4 h-4 text-slate-400" />
+                <div>
+                  <p class="text-xs font-medium truncate">{{ tpl.name }}</p>
+                  <p class="text-[9px] opacity-60">{{ tpl.fields.length }} variables</p>
+                </div>
+              </button>
+            </div>
+
+            <div v-if="forms.length && copyFromFormId !== ''" class="space-y-1.5">
+              <div class="max-h-32 overflow-y-auto space-y-1.5 border border-white/[0.05] rounded-lg p-1.5 bg-black/[0.1]">
+                <button
+                  type="button"
+                  v-for="f in forms"
+                  :key="f.id"
+                  @click="copyFromFormId = f.id; selectedTemplate = ''"
+                  class="w-full flex items-center gap-3 p-2 rounded border text-left transition-all"
+                  :class="copyFromFormId === f.id ? 'bg-indigo-600/10 border-indigo-500/30 text-white' : 'bg-transparent border-transparent text-slate-400 hover:bg-white/[0.02]'"
+                >
+                  <UIcon name="i-heroicons-document-duplicate" class="w-4 h-4 shrink-0 opacity-70" />
+                  <div class="min-w-0">
+                    <p class="text-xs font-medium truncate">{{ f.title }}</p>
+                    <p class="text-[9px] text-slate-500">{{ Array.isArray(f.fields) ? f.fields.length : 0 }} tracking nodes · {{ f.clients?.name || 'Unassigned' }}</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[10px] uppercase font-semibold text-slate-400 tracking-wider mb-1.5">
+              Target Entity Client <span class="text-indigo-400">*</span>
+            </label>
+            <div class="relative">
+              <select
+                v-model="newForm.client_id"
+                required
+                class="w-full bg-black/20 border border-white/[0.08] focus:border-indigo-500 rounded-lg px-3 py-2 text-white text-xs focus:outline-none appearance-none cursor-pointer"
+              >
+                <option value="" disabled>Select administrative client workspace...</option>
+                <option v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
+              </select>
+              <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-3.5 h-3.5 pointer-events-none" />
+            </div>
+          </div>
+
+          <div v-if="clientProjects.length">
+            <label class="block text-[10px] uppercase font-semibold text-slate-400 tracking-wider mb-1.5">
+              Link operational project timeline (optional)
+            </label>
+            <div class="relative">
+              <select v-model="newForm.project_id" class="w-full bg-black/20 border border-white/[0.08] focus:border-indigo-500 rounded-lg px-3 py-2 text-white text-xs focus:outline-none appearance-none cursor-pointer">
+                <option value="">Do not link — configure isolated entry parameters</option>
+                <option v-for="p in clientProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
+              </select>
+              <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-3.5 h-3.5 pointer-events-none" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[10px] uppercase font-semibold text-slate-400 tracking-wider mb-1.5">Form Framework Title <span class="text-indigo-400">*</span></label>
+            <input
+              v-model="newForm.title"
+              type="text"
+              placeholder="e.g., Strategic Operational Blueprint Intake"
+              class="w-full bg-black/20 border border-white/[0.08] focus:border-indigo-500 rounded-lg px-3 py-2 text-white text-xs focus:outline-none placeholder-slate-600"
+            />
+          </div>
+
+          <div>
+            <label class="block text-[10px] uppercase font-semibold text-slate-400 tracking-wider mb-1.5">Public Facing Directives & Context</label>
+            <textarea
+              v-model="newForm.description"
+              rows="2"
+              placeholder="Provide clean operational guidelines contextually visible to the recipient user matrix..."
+              class="w-full bg-black/20 border border-white/[0.08] focus:border-indigo-500 rounded-lg px-3 py-2 text-white text-xs focus:outline-none resize-none placeholder-slate-600"
+            ></textarea>
+          </div>
+
+          <div class="flex gap-2 pt-2 border-t border-white/[0.04]">
+            <button type="button" @click="showNewModal = false" class="flex-1 py-2 rounded-lg border border-white/[0.06] text-slate-400 hover:text-white text-xs font-medium transition-all">
+              Cancel
+            </button>
+            <button
+              @click="createForm"
+              :disabled="creating || !newForm.title.trim() || !newForm.client_id"
+              class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-xs font-medium transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"
+            >
+              <UIcon v-if="creating" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
+              <span v-else>Deploy Grid Matrix</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <Transition 
+      enter-active-class="transform ease-out duration-200 transition" 
+      enter-from-class="translate-y-2 opacity-0" 
+      enter-to-class="translate-y-0 opacity-100" 
+      leave-active-class="transition ease-in duration-100" 
+      leave-from-class="opacity-100" 
+      leave-to-class="opacity-0"
+    >
+      <div v-if="toast.show" class="fixed bottom-4 right-4 z-50">
+        <div class="flex items-center gap-2.5 px-3 py-2 rounded-lg shadow-xl border bg-[#0c101b]" :class="toast.type === 'success' ? 'border-emerald-500/30' : 'border-rose-500/30'">
+          <UIcon :name="toast.type === 'success' ? 'i-heroicons-check-circle' : 'i-heroicons-exclamation-circle'" class="w-4 h-4" :class="toast.type === 'success' ? 'text-emerald-400' : 'text-rose-400'" />
+          <span class="font-medium text-xs text-white">{{ toast.message }}</span>
+        </div>
+      </div>
+    </Transition>
+
+  </div>
+</template>
+
+<script setup>
+import { FORM_TEMPLATES, useOnboarding } from '~/composables/useOnboarding'
+
+const supabase = useSupabaseClient()
+const user     = useSupabaseUser()
+const route    = useRoute()
+
+const loading = ref(true)
+const forms   = ref([])
+const toast   = ref({ show: false, message: '', type: 'success' })
+
+const showNewModal     = ref(false)
+const creating         = ref(false)
+const selectedTemplate = ref('')       // built-in template target identifier
+const copyFromFormId   = ref('')       // existing layout baseline ID target
+const newForm = ref({ title: '', description: '', client_id: '', project_id: '' })
+
+const clients  = ref([])
+const projects = ref([])
+
+const showToast = (msg, type = 'success') => {
+  toast.value = { show: true, message: msg, type }
+  setTimeout(() => { toast.value.show = false }, 3000)
+}
+
+const fetchData = async () => {
+  loading.value = true
+  try {
+    const { data } = await supabase
+      .from('onboarding_forms')
+      .select('*, clients(id, name), projects(id, name)')
+      .order('created_at', { ascending: false })
+    forms.value = data || []
+
+    const { data: cData } = await supabase.from('clients').select('id, name').order('name')
+    clients.value = cData || []
+
+    const { data: pData } = await supabase.from('projects').select('id, name, client_id').order('name')
+    projects.value = pData || []
+  } catch (e) { 
+    console.error(e) 
+  } finally { 
+    loading.value = false 
+  }
+}
+
+const clientProjects = computed(() =>
+  newForm.value.client_id
+    ? projects.value.filter(p => p.client_id === newForm.value.client_id)
+    : []
+)
+
+// Structural Mutual Exclusion Watches
+watch(selectedTemplate, (v) => { if (v) copyFromFormId.value = '' })
+watch(copyFromFormId,   (v) => { if (v) selectedTemplate.value = '' })
+
+const createForm = async () => {
+  if (!newForm.value.title.trim())   return showToast('Form mapping requires descriptive title', 'error')
+  if (!newForm.value.client_id)      return showToast('Target structural client definition required', 'error')
+
+  creating.value = true
+  try {
+    let userId = user.value?.id
+    if (!userId) {
+      const { data } = await supabase.auth.getSession()
+      userId = data.session?.user?.id
+    }
+    if (!userId) throw new Error('Authentication parameters missing')
+
+    const { templateFields, copyFields } = useOnboarding()
+    let fields = []
+
+    if (selectedTemplate.value) {
+      fields = templateFields(selectedTemplate.value)
+    } else if (copyFromFormId.value) {
+      const src = forms.value.find(f => f.id === copyFromFormId.value)
+      if (src?.fields) fields = copyFields(src.fields)
+    }
+
+    const { data: inserted, error } = await supabase
+      .from('onboarding_forms')
+      .insert({
+        user_id:     userId,
+        title:       newForm.value.title.trim(),
+        description: newForm.value.description || null,
+        client_id:   newForm.value.client_id,
+        project_id:  newForm.value.project_id || null,
+        fields,
+        status:      'draft',
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+
+    showNewModal.value  = false
+    newForm.value       = { title: '', description: '', client_id: '', project_id: '' }
+    selectedTemplate.value = ''
+    copyFromFormId.value   = ''
+    await navigateTo(`/onboarding/${inserted.id}`)
+  } catch (e) {
+    showToast(e.message, 'error')
+  } finally {
+    creating.value = false
+  }
+}
+
+const deleteForm = async (id) => {
+  if (!confirm('Confirm definitive removal of this initialization vector?')) return
+  try {
+    await supabase.from('onboarding_forms').delete().eq('id', id)
+    forms.value = forms.value.filter(f => f.id !== id)
+    showToast('Onboarding profile purged successfully')
+  } catch (e) {
+    showToast(e.message, 'error')
+  }
+}
+
+const statusConfig = {
+  draft:     { label: 'Draft',     color: 'text-slate-400  bg-slate-400/10  border-slate-500/20',  dot: 'bg-slate-400' },
+  sent:      { label: 'Dispatched', color: 'text-indigo-400 bg-indigo-400/10 border-indigo-500/20', dot: 'bg-indigo-400' },
+  completed: { label: 'Finalized',  color: 'text-emerald-400 bg-emerald-400/10 border-emerald-500/20', dot: 'bg-emerald-400' },
+}
+
+const copyLink = (token) => {
+  const url = `${window.location.origin}/brief/${token}`
+  navigator.clipboard.writeText(url)
+  showToast('Access pipeline URL mapped to clipboard')
+}
+
+onMounted(async () => {
+  await fetchData()
+  
+  if (route.query.new === '1' && route.query.client) {
+    newForm.value.client_id = route.query.client
+    showNewModal.value = true
+  }
+})
+</script>

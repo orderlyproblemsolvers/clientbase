@@ -61,7 +61,7 @@ onMounted(() => fetchInvoice())
 </script>
 
 <template>
-  <div class="min-h-screen bg-white font-sans">
+  <div class="min-h-screen bg-white ">
 
     <!-- Print button — hidden when printing -->
     <div class="no-print fixed top-4 right-4 flex gap-2 z-50">

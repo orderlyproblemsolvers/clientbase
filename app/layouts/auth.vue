@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen h-screen flex overflow-hidden bg-base font-sans text-white">
+  <div class="min-h-screen h-screen flex overflow-hidden bg-base  text-white">
     
     <!-- Left Hero Section -->
     <div class="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-secondary">

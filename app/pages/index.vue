@@ -3,25 +3,25 @@ const supabase = useSupabaseClient()
 const user     = useSupabaseUser()
 
 // ── State ─────────────────────────────────────────────────────────────────────
-const loading    = ref(true)
-const clients    = ref<any[]>([])
+const loading     = ref(true)
+const clients     = ref<any[]>([])
 const searchQuery = ref('')
-const showModal  = ref(false)
-const creating   = ref(false)
+const showModal   = ref(false)
+const creating    = ref(false)
 
 // Dashboard data
 const stats = ref({
-  totalClients:    0,
-  activeProjects:  0,
-  outstandingNGN:  0,
-  overdueCount:    0,
+  totalClients:   0,
+  activeProjects: 0,
+  outstandingNGN: 0,
+  overdueCount:   0,
 })
-const overdueInvoices   = ref<any[]>([])
+const overdueInvoices    = ref<any[]>([])
 const upcomingMilestones = ref<any[]>([])
 const tasksDueToday      = ref<any[]>([])
 const recentInvoices     = ref<any[]>([])
 
-// Add client form (unchanged from original)
+// Add client form
 const currentStep = ref(1)
 const categories  = ['Educational', 'Fintech', 'Internal', 'Development', 'Personal']
 const newClient   = ref({
@@ -35,8 +35,8 @@ const filteredClients = computed(() => {
   const q = searchQuery.value.toLowerCase()
   return clients.value.filter(c =>
     c.name.toLowerCase().includes(q) ||
-    (c.website   && c.website.toLowerCase().includes(q))   ||
-    (c.category  && c.category.toLowerCase().includes(q))
+    (c.website  && c.website.toLowerCase().includes(q))  ||
+    (c.category && c.category.toLowerCase().includes(q))
   )
 })
 
@@ -61,28 +61,20 @@ const todayLabel = computed(() =>
 const fetchDashboard = async () => {
   loading.value = true
   try {
-    // Clients
     const { data: clientData } = await supabase
-      .from('clients')
-      .select('*')
-      .order('created_at', { ascending: false })
+      .from('clients').select('*').order('created_at', { ascending: false })
     clients.value = clientData || []
     stats.value.totalClients = clients.value.length
 
-    // Active projects count
     const { count: projCount } = await supabase
-      .from('projects')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'active')
+      .from('projects').select('*', { count: 'exact', head: true }).eq('status', 'active')
     stats.value.activeProjects = projCount || 0
 
-    // Invoices — outstanding + overdue
     const { data: invoiceData } = await supabase
       .from('retainers')
       .select('id, title, amount, currency, status, due_date, invoice_number, clients(id, name), invoice_items(*)')
       .in('status', ['pending'])
       .order('due_date', { ascending: true })
-
     const allPending = invoiceData || []
 
     const getTotal = (r: any) => {
@@ -96,38 +88,27 @@ const fetchDashboard = async () => {
       .reduce((s, r) => s + getTotal(r), 0)
 
     overdueInvoices.value = allPending
-      .filter(r => r.due_date && r.due_date < todayStr)
-      .slice(0, 5)
-
+      .filter(r => r.due_date && r.due_date < todayStr).slice(0, 5)
     stats.value.overdueCount = overdueInvoices.value.length
 
-    // Recent invoices (last 5 regardless of status)
     const { data: recentInv } = await supabase
       .from('retainers')
       .select('id, title, amount, currency, status, due_date, invoice_number, clients(id, name), invoice_items(*)')
-      .order('created_at', { ascending: false })
-      .limit(5)
+      .order('created_at', { ascending: false }).limit(5)
     recentInvoices.value = recentInv || []
 
-    // Milestones due in next 7 days (not complete)
     const { data: milestoneData } = await supabase
       .from('milestones')
       .select('id, title, due_date, status, project_id, projects(id, name, clients(id, name))')
-      .gte('due_date', todayStr)
-      .lte('due_date', in7DaysStr)
-      .neq('status', 'complete')
-      .order('due_date', { ascending: true })
-      .limit(6)
+      .gte('due_date', todayStr).lte('due_date', in7DaysStr)
+      .neq('status', 'complete').order('due_date', { ascending: true }).limit(6)
     upcomingMilestones.value = milestoneData || []
 
-    // Tasks due today or overdue (not done)
     const { data: taskData } = await supabase
       .from('tasks')
       .select('id, title, due_date, priority, status, project_id, milestones(id, title, projects(id, name, clients(id, name)))')
-      .lte('due_date', todayStr)
-      .neq('status', 'done')
-      .order('due_date', { ascending: true })
-      .limit(5)
+      .lte('due_date', todayStr).neq('status', 'done')
+      .order('due_date', { ascending: true }).limit(5)
     tasksDueToday.value = taskData || []
 
   } catch (e) {
@@ -137,7 +118,7 @@ const fetchDashboard = async () => {
   }
 }
 
-// ── Add client (unchanged from original) ─────────────────────────────────────
+// ── Add client ────────────────────────────────────────────────────────────────
 const closeModal = () => {
   showModal.value = false
   setTimeout(() => {
@@ -165,15 +146,22 @@ const createClient = async () => {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const getCategoryIcon = (cat: string) => {
-  switch (cat) {
-    case 'Educational': return 'i-heroicons-academic-cap'
-    case 'Fintech':     return 'i-heroicons-banknotes'
-    case 'Internal':    return 'i-heroicons-building-office'
-    case 'Personal':    return 'i-heroicons-user'
-    default:            return 'i-heroicons-code-bracket'
-  }
-}
+const getCategoryColor = (cat: string) => ({
+  'Educational': 'text-blue-300    bg-blue-400/10    border-blue-400/20',
+  'Fintech':     'text-violet-300  bg-violet-400/10  border-violet-400/20',
+  'Internal':    'text-orange-300  bg-orange-400/10  border-orange-400/20',
+  'Personal':    'text-pink-300    bg-pink-400/10    border-pink-400/20',
+})[cat] || 'text-emerald-300 bg-emerald-400/10 border-emerald-400/20'
+
+const getCategoryIcon = (cat: string) => ({
+  'Educational': 'i-heroicons-academic-cap',
+  'Fintech':     'i-heroicons-banknotes',
+  'Internal':    'i-heroicons-building-office',
+  'Personal':    'i-heroicons-user',
+})[cat] || 'i-heroicons-code-bracket'
+
+const getInitials = (name: string) =>
+  name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase() || '?'
 
 const fmt = (amount: number, currency = 'NGN') =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount)
@@ -190,16 +178,19 @@ const daysFromNow = (d: string) => {
   return `in ${days}d`
 }
 
+const isOverdue = (d: string) =>
+  Math.ceil((new Date(d + 'T00:00:00').getTime() - new Date().setHours(0, 0, 0, 0)) / 86400000) < 0
+
 const isUrgent = (d: string) => {
-  const days = Math.ceil((new Date(d + 'T00:00:00').getTime() - new Date().setHours(0,0,0,0)) / 86400000)
+  const days = Math.ceil((new Date(d + 'T00:00:00').getTime() - new Date().setHours(0, 0, 0, 0)) / 86400000)
   return days <= 2
 }
 
 const invoiceStatusConfig: Record<string, { label: string; color: string; dot: string }> = {
-  pending:   { label: 'Pending',   color: 'text-orange-400', dot: 'bg-orange-400' },
-  paid:      { label: 'Paid',      color: 'text-green-400',  dot: 'bg-green-400'  },
-  overdue:   { label: 'Overdue',   color: 'text-red-400',    dot: 'bg-red-400'    },
-  cancelled: { label: 'Cancelled', color: 'text-gray-500',   dot: 'bg-gray-500'   },
+  pending:   { label: 'Pending',   color: 'text-amber-400',   dot: 'bg-amber-400'   },
+  paid:      { label: 'Paid',      color: 'text-emerald-400', dot: 'bg-emerald-400' },
+  overdue:   { label: 'Overdue',   color: 'text-red-400',     dot: 'bg-red-400'     },
+  cancelled: { label: 'Cancelled', color: 'text-slate-500',   dot: 'bg-slate-500'   },
 }
 
 const effectiveInvoiceStatus = (r: any) =>
@@ -211,129 +202,180 @@ const getInvoiceTotal = (r: any) => {
   return Number(r.amount)
 }
 
-const priorityColor: Record<string, string> = {
-  high:   'text-red-400    bg-red-400/10',
-  medium: 'text-yellow-400 bg-yellow-400/10',
-  low:    'text-gray-400   bg-gray-400/10',
+const priorityConfig: Record<string, { label: string; color: string }> = {
+  high:   { label: 'High',   color: 'text-red-400    bg-red-400/10    border-red-400/20'    },
+  medium: { label: 'Medium', color: 'text-amber-400  bg-amber-400/10  border-amber-400/20'  },
+  low:    { label: 'Low',    color: 'text-slate-400  bg-slate-400/10  border-slate-400/20'  },
 }
 
 const milestoneStatusDot: Record<string, string> = {
-  pending:     'bg-gray-400',
+  pending:     'bg-slate-400',
   in_progress: 'bg-blue-400',
-  complete:    'bg-green-400',
+  complete:    'bg-emerald-400',
 }
 
 onMounted(() => fetchDashboard())
 </script>
 
 <template>
-  <div class="min-h-screen bg-base font-sans">
+  <div class="min-h-screen bg-base ">
 
-    <!-- ── Header ───────────────────────────────────────────────────────────── -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+    <!-- ── Page header ─────────────────────────────────────────────────────── -->
+    <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
       <div>
-        <p class="text-gray-500 text-sm font-medium">{{ todayLabel }}</p>
-        <h1 class="text-3xl font-bold text-white tracking-tight mt-0.5">{{ greeting }} 👋</h1>
+        <p class="text-xs font-medium text-slate-500 mb-1">{{ todayLabel }}</p>
+        <h1 class="text-2xl font-bold text-white tracking-tight leading-none">
+          {{ greeting }}<span class="text-slate-500">,</span>
+          <span class="text-primary"> {{ user?.email?.split('@')[0] || 'there' }}</span>
+        </h1>
       </div>
-      <div class="flex items-center gap-3 w-full md:w-auto">
-        <UInput
-          v-model="searchQuery"
-          icon="i-lucide-search"
-          size="md"
-          variant="outline"
-          placeholder="Search clients..."
-          class="bg-secondary text-white w-full md:w-64"
-        />
-        <UButton
-          @click="showModal = true"
-          class="bg-primary hover:bg-primary/80 text-white active:scale-95 shrink-0"
-          leading-icon="i-heroicons-plus"
-        >
-          <span class="hidden md:inline">Add Client</span>
-        </UButton>
-      </div>
-    </div>
 
-    <!-- ── Loading skeleton ─────────────────────────────────────────────────── -->
-    <div v-if="loading" class="space-y-6">
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div v-for="i in 4" :key="i" class="h-28 bg-secondary/50 animate-pulse rounded-2xl"></div>
+      <div class="flex items-center gap-2 w-full sm:w-auto">
+        <!-- Search -->
+        <div class="relative flex-1 sm:w-56 sm:flex-none">
+          <UIcon
+            name="i-heroicons-magnifying-glass"
+            class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none"
+            aria-hidden="true"
+          />
+          <input
+            v-model="searchQuery"
+            type="search"
+            placeholder="Search clients…"
+            aria-label="Search clients"
+            class="w-full bg-white/[0.04] border border-white/8 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/40 focus:outline-none transition-all duration-150"
+          />
+        </div>
+
+        <!-- Add client CTA -->
+        <button
+          @click="showModal = true"
+          class="flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary/90 text-white text-sm font-semibold rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all duration-150 active:scale-[0.98] shrink-0"
+          aria-label="Add new client"
+        >
+          <UIcon name="i-heroicons-plus" class="w-4 h-4" />
+          <span>Add Client</span>
+        </button>
       </div>
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-2 h-64 bg-secondary/50 animate-pulse rounded-2xl"></div>
-        <div class="h-64 bg-secondary/50 animate-pulse rounded-2xl"></div>
+    </header>
+
+    <!-- ── Loading skeleton ────────────────────────────────────────────────── -->
+    <div v-if="loading" class="space-y-6" aria-label="Loading dashboard" aria-busy="true">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div v-for="i in 4" :key="i" class="h-24 bg-white/5 animate-pulse rounded-2xl"></div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="lg:col-span-2 h-64 bg-white/5 animate-pulse rounded-2xl"></div>
+        <div class="h-64 bg-white/5 animate-pulse rounded-2xl"></div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div v-for="i in 4" :key="i" class="h-32 bg-white/5 animate-pulse rounded-2xl"></div>
       </div>
     </div>
 
     <template v-else>
 
       <!-- ── Stat cards ──────────────────────────────────────────────────────── -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
 
         <!-- Total clients -->
-        <div class="bg-secondary/50 border border-white/5 p-5 rounded-2xl relative overflow-hidden hover:bg-secondary/80 transition-colors group">
-          <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <UIcon name="i-heroicons-users" class="w-16 h-16 text-primary" />
+        <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-5 hover:bg-white/[0.05] transition-colors duration-150">
+          <div class="flex items-start justify-between mb-3">
+            <div class="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+              <UIcon name="i-heroicons-users" class="w-4 h-4 text-primary" aria-hidden="true" />
+            </div>
           </div>
-          <p class="text-gray-500 text-[10px] uppercase font-bold tracking-widest mb-2">Total Clients</p>
-          <p class="text-3xl font-bold text-white">{{ stats.totalClients }}</p>
+          <p class="text-2xl font-bold text-white tabular-nums">{{ stats.totalClients }}</p>
+          <p class="text-[11px] font-medium text-slate-500 mt-1">Total Clients</p>
         </div>
 
         <!-- Active projects -->
-        <NuxtLink to="/projects" class="bg-secondary/50 border border-white/5 p-5 rounded-2xl relative overflow-hidden hover:bg-secondary/80 transition-colors group">
-          <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <UIcon name="i-heroicons-folder-open" class="w-16 h-16 text-blue-400" />
+        <NuxtLink
+          to="/projects"
+          class="bg-white/[0.03] border border-white/6 rounded-2xl p-5 hover:bg-white/[0.05] hover:border-white/10 transition-all duration-150 group"
+        >
+          <div class="flex items-start justify-between mb-3">
+            <div class="w-8 h-8 rounded-xl bg-blue-400/10 flex items-center justify-center">
+              <UIcon name="i-heroicons-folder-open" class="w-4 h-4 text-blue-400" aria-hidden="true" />
+            </div>
+            <UIcon name="i-heroicons-arrow-right" class="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 group-hover:translate-x-0.5 transition-all duration-150" aria-hidden="true" />
           </div>
-          <p class="text-gray-500 text-[10px] uppercase font-bold tracking-widest mb-2">Active Projects</p>
-          <p class="text-3xl font-bold text-white">{{ stats.activeProjects }}</p>
+          <p class="text-2xl font-bold text-white tabular-nums">{{ stats.activeProjects }}</p>
+          <p class="text-[11px] font-medium text-slate-500 mt-1">Active Projects</p>
         </NuxtLink>
 
         <!-- Outstanding -->
-        <NuxtLink to="/retainers" class="bg-secondary/50 border border-white/5 p-5 rounded-2xl relative overflow-hidden hover:bg-secondary/80 transition-colors group">
-          <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <UIcon name="i-heroicons-banknotes" class="w-16 h-16 text-orange-400" />
+        <NuxtLink
+          to="/retainers"
+          class="bg-white/[0.03] border border-white/6 rounded-2xl p-5 hover:bg-white/[0.05] hover:border-white/10 transition-all duration-150 group"
+        >
+          <div class="flex items-start justify-between mb-3">
+            <div class="w-8 h-8 rounded-xl bg-amber-400/10 flex items-center justify-center">
+              <UIcon name="i-heroicons-banknotes" class="w-4 h-4 text-amber-400" aria-hidden="true" />
+            </div>
+            <UIcon name="i-heroicons-arrow-right" class="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 group-hover:translate-x-0.5 transition-all duration-150" aria-hidden="true" />
           </div>
-          <p class="text-gray-500 text-[10px] uppercase font-bold tracking-widest mb-2">Outstanding (NGN)</p>
-          <p class="text-2xl font-bold text-orange-400">{{ fmt(stats.outstandingNGN) }}</p>
+          <p class="text-xl font-bold text-amber-400 tabular-nums leading-tight">{{ fmt(stats.outstandingNGN) }}</p>
+          <p class="text-[11px] font-medium text-slate-500 mt-1">Outstanding (NGN)</p>
         </NuxtLink>
 
-        <!-- Overdue invoices -->
-        <NuxtLink to="/retainers" class="bg-secondary/50 border border-white/5 p-5 rounded-2xl relative overflow-hidden hover:bg-secondary/80 transition-colors group" :class="stats.overdueCount > 0 ? 'border-red-500/20' : ''">
-          <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <UIcon name="i-heroicons-exclamation-triangle" class="w-16 h-16 text-red-400" />
+        <!-- Overdue -->
+        <NuxtLink
+          to="/retainers"
+          class="rounded-2xl p-5 transition-all duration-150 group"
+          :class="stats.overdueCount > 0
+            ? 'bg-red-500/[0.06] border border-red-500/15 hover:bg-red-500/10'
+            : 'bg-white/[0.03] border border-white/6 hover:bg-white/[0.05]'"
+        >
+          <div class="flex items-start justify-between mb-3">
+            <div
+              class="w-8 h-8 rounded-xl flex items-center justify-center"
+              :class="stats.overdueCount > 0 ? 'bg-red-400/15' : 'bg-slate-400/10'"
+            >
+              <UIcon
+                name="i-heroicons-exclamation-triangle"
+                class="w-4 h-4"
+                :class="stats.overdueCount > 0 ? 'text-red-400' : 'text-slate-400'"
+                aria-hidden="true"
+              />
+            </div>
+            <UIcon name="i-heroicons-arrow-right" class="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 group-hover:translate-x-0.5 transition-all duration-150" aria-hidden="true" />
           </div>
-          <p class="text-[10px] uppercase font-bold tracking-widest mb-2" :class="stats.overdueCount > 0 ? 'text-red-400' : 'text-gray-500'">Overdue Invoices</p>
-          <p class="text-3xl font-bold" :class="stats.overdueCount > 0 ? 'text-red-400' : 'text-white'">{{ stats.overdueCount }}</p>
+          <p
+            class="text-2xl font-bold tabular-nums"
+            :class="stats.overdueCount > 0 ? 'text-red-400' : 'text-white'"
+          >{{ stats.overdueCount }}</p>
+          <p class="text-[11px] font-medium text-slate-500 mt-1">Overdue Invoices</p>
         </NuxtLink>
 
       </div>
 
-      <!-- ── Overdue alert banner ─────────────────────────────────────────────── -->
+      <!-- ── Overdue alert banner ────────────────────────────────────────────── -->
       <div v-if="overdueInvoices.length > 0" class="mb-6">
-        <div class="bg-red-500/5 border border-red-500/20 rounded-2xl p-4">
-          <div class="flex items-center gap-2 mb-3">
-            <span class="relative flex h-2 w-2">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+        <div class="bg-red-500/[0.05] border border-red-500/15 rounded-2xl p-4">
+          <div class="flex items-center gap-2.5 mb-3">
+            <span class="relative flex h-2 w-2 shrink-0">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60"></span>
               <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
             </span>
-            <p class="text-red-400 text-xs font-bold uppercase tracking-widest">
-              {{ overdueInvoices.length }} overdue invoice{{ overdueInvoices.length !== 1 ? 's' : '' }} — action needed
+            <p class="text-red-400 text-xs font-semibold">
+              {{ overdueInvoices.length }} overdue invoice{{ overdueInvoices.length !== 1 ? 's' : '' }} require attention
             </p>
           </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             <NuxtLink
               v-for="inv in overdueInvoices"
               :key="inv.id"
               to="/retainers"
-              class="flex items-center justify-between bg-red-500/5 border border-red-500/10 hover:border-red-500/30 rounded-xl px-4 py-3 transition-colors group"
+              class="flex items-center justify-between bg-white/[0.03] hover:bg-red-500/[0.06] border border-white/5 hover:border-red-500/20 rounded-xl px-3.5 py-3 transition-all duration-150"
             >
               <div class="min-w-0">
-                <p class="text-white font-semibold text-sm truncate">{{ inv.clients?.name }}</p>
-                <p class="text-gray-500 text-xs truncate">{{ inv.invoice_number }} · {{ inv.title }}</p>
+                <p class="text-white text-sm font-semibold truncate">{{ inv.clients?.name }}</p>
+                <p class="text-slate-500 text-xs truncate font-mono mt-0.5">{{ inv.invoice_number }}</p>
               </div>
               <div class="text-right shrink-0 ml-3">
-                <p class="text-red-400 font-mono font-bold text-sm">{{ fmt(getInvoiceTotal(inv), inv.currency) }}</p>
-                <p class="text-red-500 text-[10px] font-medium">{{ daysFromNow(inv.due_date) }}</p>
+                <p class="text-red-400 font-semibold text-sm tabular-nums">{{ fmt(getInvoiceTotal(inv), inv.currency) }}</p>
+                <p class="text-red-500/80 text-[10px] font-medium mt-0.5">{{ daysFromNow(inv.due_date) }}</p>
               </div>
             </NuxtLink>
           </div>
@@ -341,116 +383,137 @@ onMounted(() => fetchDashboard())
       </div>
 
       <!-- ── Main grid ───────────────────────────────────────────────────────── -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
 
-        <!-- Left column: Milestones + Tasks -->
-        <div class="lg:col-span-2 space-y-6">
+        <!-- Left: Milestones + Tasks ────────────────────────────────────────── -->
+        <div class="lg:col-span-2 space-y-5">
 
           <!-- Upcoming milestones -->
-          <div class="bg-secondary/40 border border-white/5 rounded-2xl overflow-hidden">
+          <div class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
             <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
-              <h2 class="text-white font-bold flex items-center gap-2">
-                <UIcon name="i-heroicons-flag" class="w-4 h-4 text-primary" />
-                Milestones — Next 7 Days
-              </h2>
-              <NuxtLink to="/calendar" class="text-[10px] text-gray-500 hover:text-primary transition-colors font-bold uppercase tracking-wide">
-                View Calendar →
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <UIcon name="i-heroicons-flag" class="w-3.5 h-3.5 text-primary" aria-hidden="true" />
+                </div>
+                <h2 class="text-sm font-semibold text-white">Milestones</h2>
+                <span class="text-[10px] text-slate-500 font-medium bg-white/5 px-1.5 py-0.5 rounded-md">Next 7 days</span>
+              </div>
+              <NuxtLink
+                to="/calendar"
+                class="text-xs text-slate-500 hover:text-primary transition-colors duration-150 font-medium flex items-center gap-1"
+              >
+                Calendar
+                <UIcon name="i-heroicons-arrow-right" class="w-3 h-3" aria-hidden="true" />
               </NuxtLink>
             </div>
 
             <!-- Empty -->
             <div v-if="upcomingMilestones.length === 0" class="px-5 py-10 text-center">
-              <UIcon name="i-heroicons-check-badge" class="w-10 h-10 text-gray-700 mx-auto mb-3" />
-              <p class="text-gray-500 text-sm font-medium">No milestones due in the next 7 days</p>
-              <p class="text-gray-600 text-xs mt-1">You're clear for the week.</p>
+              <div class="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-3">
+                <UIcon name="i-heroicons-check-badge" class="w-5 h-5 text-slate-600" aria-hidden="true" />
+              </div>
+              <p class="text-sm font-medium text-slate-400">All clear for the week</p>
+              <p class="text-xs text-slate-600 mt-1">No milestones due in the next 7 days.</p>
             </div>
 
             <!-- List -->
-            <div v-else class="divide-y divide-white/5">
+            <div v-else class="divide-y divide-white/[0.04]">
               <NuxtLink
                 v-for="m in upcomingMilestones"
                 :key="m.id"
                 :to="`/projects/${m.project_id}`"
-                class="flex items-center gap-4 px-5 py-4 hover:bg-white/[0.03] transition-colors group"
+                class="flex items-center gap-4 px-5 py-3.5 hover:bg-white/[0.03] transition-colors duration-150 group"
               >
-                <!-- Status dot -->
                 <div
-                  class="w-2.5 h-2.5 rounded-full shrink-0 mt-0.5"
-                  :class="milestoneStatusDot[m.status] || 'bg-gray-400'"
+                  class="w-2 h-2 rounded-full shrink-0"
+                  :class="milestoneStatusDot[m.status] || 'bg-slate-400'"
+                  aria-hidden="true"
                 ></div>
 
-                <!-- Details -->
                 <div class="flex-1 min-w-0">
-                  <p class="text-white text-sm font-medium truncate group-hover:text-primary transition-colors">
+                  <p class="text-sm font-medium text-white group-hover:text-primary transition-colors duration-150 truncate">
                     {{ m.title }}
                   </p>
-                  <p class="text-gray-500 text-xs mt-0.5 flex items-center gap-1.5">
-                    <UIcon name="i-heroicons-folder-open" class="w-3 h-3" />
-                    {{ m.projects?.name }}
-                    <span v-if="m.projects?.clients?.name" class="text-gray-600">·</span>
-                    <UIcon v-if="m.projects?.clients?.name" name="i-heroicons-building-office-2" class="w-3 h-3" />
-                    {{ m.projects?.clients?.name }}
+                  <p class="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 truncate">
+                    <UIcon name="i-heroicons-folder-open" class="w-3 h-3 shrink-0" aria-hidden="true" />
+                    <span class="truncate">{{ m.projects?.name }}</span>
+                    <span v-if="m.projects?.clients?.name" class="text-slate-700 shrink-0">·</span>
+                    <span v-if="m.projects?.clients?.name" class="truncate text-slate-600">{{ m.projects?.clients?.name }}</span>
                   </p>
                 </div>
 
-                <!-- Due -->
                 <div class="shrink-0 text-right">
                   <span
-                    class="text-xs font-bold px-2 py-1 rounded-lg"
+                    class="text-xs font-semibold px-2 py-1 rounded-lg tabular-nums"
                     :class="isUrgent(m.due_date)
                       ? 'text-red-400 bg-red-400/10'
-                      : 'text-gray-400 bg-white/5'"
+                      : 'text-slate-400 bg-white/5'"
                   >
                     {{ daysFromNow(m.due_date) }}
                   </span>
-                  <p class="text-[10px] text-gray-600 mt-1">{{ fmtDate(m.due_date) }}</p>
+                  <p class="text-[10px] text-slate-600 mt-1">{{ fmtDate(m.due_date) }}</p>
                 </div>
               </NuxtLink>
             </div>
           </div>
 
-          <!-- Tasks due today / overdue -->
-          <div v-if="tasksDueToday.length > 0" class="bg-secondary/40 border border-white/5 rounded-2xl overflow-hidden">
+          <!-- Tasks overdue or due today -->
+          <div
+            v-if="tasksDueToday.length > 0"
+            class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden"
+          >
             <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
-              <h2 class="text-white font-bold flex items-center gap-2">
-                <UIcon name="i-heroicons-check-circle" class="w-4 h-4 text-orange-400" />
-                Tasks Overdue or Due Today
-              </h2>
-              <span class="text-xs text-orange-400 font-bold bg-orange-400/10 px-2 py-0.5 rounded-full">
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-lg bg-amber-400/10 flex items-center justify-center">
+                  <UIcon name="i-heroicons-check-circle" class="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
+                </div>
+                <h2 class="text-sm font-semibold text-white">Tasks Due</h2>
+              </div>
+              <span class="text-[11px] font-semibold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full tabular-nums">
                 {{ tasksDueToday.length }}
               </span>
             </div>
-            <div class="divide-y divide-white/5">
+
+            <div class="divide-y divide-white/[0.04]">
               <NuxtLink
                 v-for="t in tasksDueToday"
                 :key="t.id"
                 :to="`/projects/${t.project_id}`"
-                class="flex items-center gap-4 px-5 py-4 hover:bg-white/[0.03] transition-colors group"
+                class="flex items-center gap-4 px-5 py-3.5 hover:bg-white/[0.03] transition-colors duration-150 group"
               >
-                <div class="w-4 h-4 rounded border-2 border-gray-600 shrink-0 group-hover:border-primary transition-colors"></div>
+                <!-- Checkbox visual -->
+                <div
+                  class="w-4 h-4 rounded border-2 shrink-0 transition-colors duration-150"
+                  :class="isOverdue(t.due_date)
+                    ? 'border-red-500/40 group-hover:border-red-400'
+                    : 'border-slate-600 group-hover:border-primary'"
+                  aria-hidden="true"
+                ></div>
+
                 <div class="flex-1 min-w-0">
-                  <p class="text-white text-sm font-medium truncate group-hover:text-primary transition-colors">
+                  <p class="text-sm font-medium text-white group-hover:text-primary transition-colors duration-150 truncate">
                     {{ t.title }}
                   </p>
-                  <p class="text-gray-500 text-xs mt-0.5 flex items-center gap-1.5">
-                    <UIcon name="i-heroicons-flag" class="w-3 h-3" />
-                    {{ t.milestones?.title }}
-                    <span class="text-gray-600">·</span>
-                    {{ t.milestones?.projects?.name }}
+                  <p class="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 truncate">
+                    <UIcon name="i-heroicons-flag" class="w-3 h-3 shrink-0" aria-hidden="true" />
+                    <span class="truncate">{{ t.milestones?.title }}</span>
+                    <span class="text-slate-700 shrink-0">·</span>
+                    <span class="truncate text-slate-600">{{ t.milestones?.projects?.name }}</span>
                   </p>
                 </div>
+
                 <div class="flex items-center gap-2 shrink-0">
                   <span
-                    class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded"
-                    :class="priorityColor[t.priority] || priorityColor.low"
+                    class="text-[10px] font-semibold px-2 py-0.5 rounded-md border"
+                    :class="priorityConfig[t.priority]?.color || priorityConfig.low.color"
                   >
-                    {{ t.priority }}
+                    {{ priorityConfig[t.priority]?.label || t.priority }}
                   </span>
                   <span
-                    class="text-xs font-bold px-2 py-1 rounded-lg"
-                    :class="t.due_date < todayStr
+                    class="text-xs font-semibold px-2 py-1 rounded-lg tabular-nums"
+                    :class="isOverdue(t.due_date)
                       ? 'text-red-400 bg-red-400/10'
-                      : 'text-orange-400 bg-orange-400/10'"
+                      : 'text-amber-400 bg-amber-400/10'"
                   >
                     {{ daysFromNow(t.due_date) }}
                   </span>
@@ -461,58 +524,71 @@ onMounted(() => fetchDashboard())
 
         </div>
 
-        <!-- Right column: Recent invoices -->
-        <div class="space-y-6">
+        <!-- Right: Invoices + Quick actions ─────────────────────────────────── -->
+        <div class="space-y-5">
 
-          <div class="bg-secondary/40 border border-white/5 rounded-2xl overflow-hidden">
+          <!-- Recent invoices -->
+          <div class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
             <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
-              <h2 class="text-white font-bold flex items-center gap-2">
-                <UIcon name="i-heroicons-banknotes" class="w-4 h-4 text-primary" />
-                Recent Invoices
-              </h2>
-              <NuxtLink to="/retainers" class="text-[10px] text-gray-500 hover:text-primary transition-colors font-bold uppercase tracking-wide">
-                All →
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <UIcon name="i-heroicons-document-text" class="w-3.5 h-3.5 text-primary" aria-hidden="true" />
+                </div>
+                <h2 class="text-sm font-semibold text-white">Invoices</h2>
+              </div>
+              <NuxtLink
+                to="/retainers"
+                class="text-xs text-slate-500 hover:text-primary transition-colors duration-150 font-medium flex items-center gap-1"
+              >
+                All
+                <UIcon name="i-heroicons-arrow-right" class="w-3 h-3" aria-hidden="true" />
               </NuxtLink>
             </div>
 
             <div v-if="recentInvoices.length === 0" class="px-5 py-10 text-center">
-              <UIcon name="i-heroicons-document-text" class="w-10 h-10 text-gray-700 mx-auto mb-3" />
-              <p class="text-gray-500 text-sm">No invoices yet</p>
-              <NuxtLink to="/retainers" class="text-primary text-xs font-bold mt-2 inline-block hover:text-white transition-colors">
-                Create first invoice →
+              <div class="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-3">
+                <UIcon name="i-heroicons-document-plus" class="w-5 h-5 text-slate-600" aria-hidden="true" />
+              </div>
+              <p class="text-sm font-medium text-slate-400 mb-3">No invoices yet</p>
+              <NuxtLink
+                to="/retainers"
+                class="text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+              >
+                Create your first invoice →
               </NuxtLink>
             </div>
 
-            <div v-else class="divide-y divide-white/5">
+            <div v-else class="divide-y divide-white/[0.04]">
               <NuxtLink
                 v-for="inv in recentInvoices"
                 :key="inv.id"
                 to="/retainers"
-                class="flex items-center gap-3 px-5 py-4 hover:bg-white/[0.03] transition-colors group"
+                class="flex items-center gap-3 px-5 py-3.5 hover:bg-white/[0.03] transition-colors duration-150 group"
               >
-                <!-- Client initial -->
-                <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
-                  {{ inv.clients?.name?.charAt(0) || '?' }}
+                <!-- Client avatar -->
+                <div class="w-8 h-8 rounded-xl bg-primary/10 border border-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
+                  {{ getInitials(inv.clients?.name || '?') }}
                 </div>
 
-                <!-- Details -->
                 <div class="flex-1 min-w-0">
-                  <p class="text-white text-xs font-semibold truncate">{{ inv.clients?.name }}</p>
-                  <p class="text-gray-500 text-[10px] truncate font-mono">{{ inv.invoice_number }}</p>
+                  <p class="text-sm font-medium text-white truncate group-hover:text-primary transition-colors duration-150">
+                    {{ inv.clients?.name }}
+                  </p>
+                  <p class="text-[10px] text-slate-500 font-mono truncate mt-0.5">{{ inv.invoice_number }}</p>
                 </div>
 
-                <!-- Amount + status -->
                 <div class="shrink-0 text-right">
-                  <p class="text-white font-mono font-semibold text-xs">
+                  <p class="text-sm font-semibold text-white tabular-nums">
                     {{ fmt(getInvoiceTotal(inv), inv.currency) }}
                   </p>
                   <div class="flex items-center justify-end gap-1 mt-0.5">
                     <div
-                      class="w-1.5 h-1.5 rounded-full"
+                      class="w-1.5 h-1.5 rounded-full shrink-0"
                       :class="invoiceStatusConfig[effectiveInvoiceStatus(inv)]?.dot"
+                      aria-hidden="true"
                     ></div>
                     <span
-                      class="text-[10px] font-bold"
+                      class="text-[10px] font-semibold"
                       :class="invoiceStatusConfig[effectiveInvoiceStatus(inv)]?.color"
                     >
                       {{ invoiceStatusConfig[effectiveInvoiceStatus(inv)]?.label }}
@@ -523,210 +599,358 @@ onMounted(() => fetchDashboard())
             </div>
           </div>
 
-          <!-- Quick links -->
-          <div class="bg-secondary/40 border border-white/5 rounded-2xl p-4">
-            <p class="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-3">Quick Actions</p>
-            <div class="space-y-2">
+          <!-- Quick actions -->
+          <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-widest text-slate-600 mb-3 px-1">Quick Actions</p>
+            <nav class="space-y-0.5">
               <NuxtLink
                 to="/retainers"
-                class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors text-gray-400 hover:text-white group"
+                class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors duration-150 group"
               >
-                <div class="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-primary/20 group-hover:text-primary transition-colors">
-                  <UIcon name="i-heroicons-document-plus" class="w-3.5 h-3.5" />
+                <div class="w-7 h-7 rounded-lg bg-white/5 group-hover:bg-primary/15 flex items-center justify-center transition-colors duration-150">
+                  <UIcon name="i-heroicons-document-plus" class="w-3.5 h-3.5 text-slate-500 group-hover:text-primary transition-colors duration-150" aria-hidden="true" />
                 </div>
-                <span class="text-sm font-medium">Create Invoice</span>
+                <span class="text-sm font-medium text-slate-400 group-hover:text-white transition-colors duration-150">Create Invoice</span>
               </NuxtLink>
+
               <NuxtLink
                 to="/projects"
-                class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors text-gray-400 hover:text-white group"
+                class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors duration-150 group"
               >
-                <div class="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-primary/20 group-hover:text-primary transition-colors">
-                  <UIcon name="i-heroicons-folder-plus" class="w-3.5 h-3.5" />
+                <div class="w-7 h-7 rounded-lg bg-white/5 group-hover:bg-primary/15 flex items-center justify-center transition-colors duration-150">
+                  <UIcon name="i-heroicons-folder-plus" class="w-3.5 h-3.5 text-slate-500 group-hover:text-primary transition-colors duration-150" aria-hidden="true" />
                 </div>
-                <span class="text-sm font-medium">New Project</span>
+                <span class="text-sm font-medium text-slate-400 group-hover:text-white transition-colors duration-150">New Project</span>
               </NuxtLink>
+
               <NuxtLink
                 to="/calendar"
-                class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors text-gray-400 hover:text-white group"
+                class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors duration-150 group"
               >
-                <div class="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-primary/20 group-hover:text-primary transition-colors">
-                  <UIcon name="i-heroicons-calendar-days" class="w-3.5 h-3.5" />
+                <div class="w-7 h-7 rounded-lg bg-white/5 group-hover:bg-primary/15 flex items-center justify-center transition-colors duration-150">
+                  <UIcon name="i-heroicons-calendar-days" class="w-3.5 h-3.5 text-slate-500 group-hover:text-primary transition-colors duration-150" aria-hidden="true" />
                 </div>
-                <span class="text-sm font-medium">View Calendar</span>
+                <span class="text-sm font-medium text-slate-400 group-hover:text-white transition-colors duration-150">View Calendar</span>
               </NuxtLink>
+
               <button
                 @click="showModal = true"
-                class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors text-gray-400 hover:text-white group"
+                class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors duration-150 group"
               >
-                <div class="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-primary/20 group-hover:text-primary transition-colors">
-                  <UIcon name="i-heroicons-user-plus" class="w-3.5 h-3.5" />
+                <div class="w-7 h-7 rounded-lg bg-white/5 group-hover:bg-primary/15 flex items-center justify-center transition-colors duration-150">
+                  <UIcon name="i-heroicons-user-plus" class="w-3.5 h-3.5 text-slate-500 group-hover:text-primary transition-colors duration-150" aria-hidden="true" />
                 </div>
-                <span class="text-sm font-medium">Add Client</span>
+                <span class="text-sm font-medium text-slate-400 group-hover:text-white transition-colors duration-150">Add Client</span>
               </button>
-            </div>
+            </nav>
           </div>
 
         </div>
       </div>
 
-      <!-- ── Client grid ─────────────────────────────────────────────────────── -->
-      <div class="mb-4 flex items-center justify-between">
-        <h2 class="text-white font-bold flex items-center gap-2">
-          <UIcon name="i-heroicons-users" class="w-4 h-4 text-gray-400" />
-          All Clients
-          <span class="text-gray-600 text-sm font-normal">({{ filteredClients.length }})</span>
-        </h2>
-      </div>
-
-      <!-- Empty clients -->
-      <div v-if="filteredClients.length === 0" class="text-center py-20">
-        <div class="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
-          <UIcon name="i-heroicons-magnifying-glass" class="w-8 h-8 text-gray-600" />
-        </div>
-        <p class="text-gray-500">{{ searchQuery ? 'No clients match your search' : 'No clients yet' }}</p>
-        <button v-if="!searchQuery" @click="showModal = true" class="text-primary hover:text-white text-sm font-bold mt-3 transition-colors">
-          + Add your first client
-        </button>
-      </div>
-
-      <!-- Client grid (kept from original, clean) -->
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-        <NuxtLink
-          v-for="c in filteredClients"
-          :key="c.id"
-          :to="`/clients/${c.id}`"
-          class="group bg-secondary/40 hover:bg-secondary border border-white/5 hover:border-white/10 transition-all rounded-2xl p-5 cursor-pointer block relative overflow-hidden"
-        >
-          <div class="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-
-          <div class="relative z-10 flex items-start justify-between mb-5">
-            <div class="w-11 h-11 rounded-xl bg-base flex items-center justify-center text-lg font-bold text-white border border-white/5 shadow-inner group-hover:scale-110 transition-transform duration-300">
-              {{ c.name.charAt(0).toUpperCase() }}
-            </div>
-
-            <span
-              class="px-2.5 py-1 rounded-full text-[10px] uppercase font-bold border tracking-wider flex items-center gap-1.5"
-              :class="{
-                'bg-blue-500/10    text-blue-400    border-blue-500/20':    c.category === 'Educational',
-                'bg-purple-500/10  text-purple-400  border-purple-500/20':  c.category === 'Fintech',
-                'bg-orange-500/10  text-orange-400  border-orange-500/20':  c.category === 'Internal',
-                'bg-emerald-500/10 text-emerald-400 border-emerald-500/20': !c.category || c.category === 'Development',
-                'bg-pink-500/10    text-pink-400    border-pink-500/20':    c.category === 'Personal',
-              }"
-            >
-              <UIcon :name="getCategoryIcon(c.category)" class="w-3 h-3" />
-              {{ c.category || 'Dev' }}
-            </span>
-          </div>
-
-          <div class="relative z-10">
-            <h3 class="text-base font-bold text-white mb-1 group-hover:text-primary transition-colors flex items-center gap-2">
-              {{ c.name }}
-              <UIcon name="i-heroicons-arrow-right" class="w-4 h-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 text-primary" />
-            </h3>
-            <p class="text-xs text-gray-500 truncate flex items-center gap-1.5">
-              <UIcon name="i-heroicons-globe-alt" class="w-3 h-3" />
-              {{ c.website || 'No website linked' }}
+      <!-- ── All clients ─────────────────────────────────────────────────────── -->
+      <section>
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <h2 class="text-base font-semibold text-white">Clients</h2>
+            <p class="text-xs text-slate-500 mt-0.5">
+              {{ filteredClients.length }} of {{ clients.length }}
+              <template v-if="searchQuery"> matching "{{ searchQuery }}"</template>
             </p>
           </div>
-        </NuxtLink>
-      </div>
+        </div>
+
+        <!-- Empty state -->
+        <div v-if="filteredClients.length === 0" class="border border-dashed border-white/8 rounded-2xl py-16 text-center">
+          <div class="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
+            <UIcon
+              :name="searchQuery ? 'i-heroicons-magnifying-glass' : 'i-heroicons-user-plus'"
+              class="w-6 h-6 text-slate-600"
+              aria-hidden="true"
+            />
+          </div>
+          <p class="text-sm font-medium text-slate-400 mb-1">
+            {{ searchQuery ? 'No clients match your search' : 'No clients yet' }}
+          </p>
+          <p class="text-xs text-slate-600 mb-5">
+            {{ searchQuery ? 'Try a different name, website, or category.' : 'Add your first client to get started.' }}
+          </p>
+          <button
+            v-if="!searchQuery"
+            @click="showModal = true"
+            class="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+          >
+            <UIcon name="i-heroicons-plus-circle" class="w-4 h-4" aria-hidden="true" />
+            Add first client
+          </button>
+        </div>
+
+        <!-- Client grid -->
+        <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <NuxtLink
+            v-for="c in filteredClients"
+            :key="c.id"
+            :to="`/clients/${c.id}`"
+            class="group bg-white/[0.03] hover:bg-white/[0.055] border border-white/6 hover:border-white/10 rounded-2xl p-5 transition-all duration-200 block"
+          >
+            <div class="flex items-start justify-between mb-4">
+              <!-- Initials avatar -->
+              <div class="w-10 h-10 rounded-xl bg-primary/10 border border-primary/10 flex items-center justify-center font-bold text-sm text-primary group-hover:bg-primary/15 transition-colors duration-150">
+                {{ getInitials(c.name) }}
+              </div>
+
+              <!-- Category badge -->
+              <span
+                class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border"
+                :class="getCategoryColor(c.category)"
+              >
+                <UIcon :name="getCategoryIcon(c.category)" class="w-3 h-3" aria-hidden="true" />
+                {{ c.category || 'Dev' }}
+              </span>
+            </div>
+
+            <h3 class="text-sm font-semibold text-white group-hover:text-primary transition-colors duration-150 mb-1.5 leading-snug flex items-center gap-2">
+              {{ c.name }}
+              <UIcon
+                name="i-heroicons-arrow-right"
+                class="w-3.5 h-3.5 text-primary opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200"
+                aria-hidden="true"
+              />
+            </h3>
+
+            <p v-if="c.website" class="text-xs text-slate-500 truncate flex items-center gap-1.5">
+              <UIcon name="i-heroicons-globe-alt" class="w-3 h-3 shrink-0" aria-hidden="true" />
+              {{ c.website.replace(/^https?:\/\//, '') }}
+            </p>
+            <p v-else class="text-xs text-slate-700 italic">No website</p>
+          </NuxtLink>
+        </div>
+      </section>
 
     </template>
 
-    <!-- ── Add Client Modal (unchanged from original) ────────────────────────── -->
-    <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div @click="closeModal" class="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity"></div>
+    <!-- ── Add Client Modal ───────────────────────────────────────────────────── -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div
+          v-if="showModal"
+          class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-client-title"
+        >
+          <!-- Scrim -->
+          <div
+            class="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            @click="closeModal"
+            aria-hidden="true"
+          ></div>
 
-      <div class="relative w-full max-w-lg bg-[#0f172a] border border-white/10 rounded-2xl p-8 shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200">
+          <!-- Panel -->
+          <div class="relative w-full sm:max-w-lg bg-[#0d1525] border border-white/8 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh]">
 
-        <div class="flex items-center justify-between mb-8">
-          <div>
-            <h2 class="text-xl font-bold text-white">Add New Client</h2>
-            <p class="text-xs text-gray-500 mt-1">
-              Step {{ currentStep }} of 2:
-              <span class="text-primary font-medium">{{ currentStep === 1 ? 'Company Profile' : 'Primary Contact' }}</span>
-            </p>
-          </div>
-          <div class="flex gap-1.5">
-            <div :class="currentStep >= 1 ? 'bg-primary w-6' : 'bg-white/10 w-2'" class="h-1.5 rounded-full transition-all duration-300"></div>
-            <div :class="currentStep >= 2 ? 'bg-primary w-6' : 'bg-white/10 w-2'" class="h-1.5 rounded-full transition-all duration-300"></div>
+            <!-- Mobile drag handle -->
+            <div class="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
+              <div class="w-10 h-1 rounded-full bg-white/10"></div>
+            </div>
+
+            <!-- Header -->
+            <div class="flex items-start justify-between px-6 py-5 border-b border-white/5 shrink-0">
+              <div>
+                <h2 id="add-client-title" class="text-base font-bold text-white">Add New Client</h2>
+                <p class="text-xs text-slate-500 mt-1">
+                  Step {{ currentStep }} of 2 ·
+                  <span class="text-primary font-medium">
+                    {{ currentStep === 1 ? 'Company Profile' : 'Primary Contact' }}
+                  </span>
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <!-- Step dots -->
+                <div class="flex items-center gap-1">
+                  <div
+                    class="h-1.5 rounded-full transition-all duration-300"
+                    :class="currentStep >= 1 ? 'w-5 bg-primary' : 'w-1.5 bg-white/10'"
+                  ></div>
+                  <div
+                    class="h-1.5 rounded-full transition-all duration-300"
+                    :class="currentStep >= 2 ? 'w-5 bg-primary' : 'w-1.5 bg-white/10'"
+                  ></div>
+                </div>
+                <button
+                  @click="closeModal"
+                  class="w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/8 transition-all duration-150 ml-1"
+                  aria-label="Close"
+                >
+                  <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <!-- Form body -->
+            <div class="overflow-y-auto flex-1 px-6 py-5">
+              <form id="add-client-form" @submit.prevent="createClient">
+
+                <!-- Step 1: Company Profile -->
+                <div v-if="currentStep === 1" class="space-y-4">
+                  <div class="space-y-1.5">
+                    <label for="client-name" class="block text-xs font-semibold text-slate-400">
+                      Client / Company Name <span class="text-red-400" aria-hidden="true">*</span>
+                    </label>
+                    <input
+                      id="client-name"
+                      v-model="newClient.name"
+                      type="text"
+                      autofocus
+                      required
+                      placeholder="e.g. Acme Corp"
+                      class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:bg-white/[0.06] focus:outline-none transition-all duration-150"
+                    />
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-1.5">
+                      <label for="client-category" class="block text-xs font-semibold text-slate-400">Category</label>
+                      <div class="relative">
+                        <select
+                          id="client-category"
+                          v-model="newClient.category"
+                          class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150"
+                        >
+                          <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
+                        </select>
+                        <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" aria-hidden="true" />
+                      </div>
+                    </div>
+
+                    <div class="space-y-1.5">
+                      <label for="client-website" class="block text-xs font-semibold text-slate-400">Website</label>
+                      <input
+                        id="client-website"
+                        v-model="newClient.website"
+                        type="url"
+                        placeholder="https://…"
+                        class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:bg-white/[0.06] focus:outline-none transition-all duration-150"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Step 2: Contact -->
+                <div v-if="currentStep === 2" class="space-y-4">
+                  <!-- Client summary card -->
+                  <div class="flex items-center gap-3 bg-primary/5 border border-primary/10 rounded-xl px-4 py-3 mb-5">
+                    <div class="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center font-bold text-sm text-primary shrink-0">
+                      {{ getInitials(newClient.name) }}
+                    </div>
+                    <div>
+                      <p class="text-sm font-semibold text-white">{{ newClient.name }}</p>
+                      <p class="text-xs text-slate-500">{{ newClient.category }}</p>
+                    </div>
+                  </div>
+
+                  <div class="space-y-1.5">
+                    <label for="contact-name" class="block text-xs font-semibold text-slate-400">Contact Name</label>
+                    <input
+                      id="contact-name"
+                      v-model="newClient.contact_name"
+                      type="text"
+                      autofocus
+                      placeholder="Jane Doe"
+                      class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:bg-white/[0.06] focus:outline-none transition-all duration-150"
+                    />
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-1.5">
+                      <label for="contact-email" class="block text-xs font-semibold text-slate-400">Email</label>
+                      <input
+                        id="contact-email"
+                        v-model="newClient.contact_email"
+                        type="email"
+                        placeholder="jane@acme.com"
+                        class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:bg-white/[0.06] focus:outline-none transition-all duration-150"
+                      />
+                    </div>
+                    <div class="space-y-1.5">
+                      <label for="contact-phone" class="block text-xs font-semibold text-slate-400">Phone</label>
+                      <input
+                        id="contact-phone"
+                        v-model="newClient.contact_phone"
+                        type="tel"
+                        placeholder="+234…"
+                        class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:bg-white/[0.06] focus:outline-none transition-all duration-150"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+              </form>
+            </div>
+
+            <!-- Footer actions -->
+            <div class="px-6 py-4 border-t border-white/5 shrink-0 flex gap-2.5">
+              <button
+                type="button"
+                @click="currentStep === 1 ? closeModal() : currentStep--"
+                class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all duration-150"
+              >
+                {{ currentStep === 1 ? 'Cancel' : 'Back' }}
+              </button>
+
+              <button
+                v-if="currentStep === 1"
+                type="button"
+                @click="currentStep++"
+                :disabled="!canProceed"
+                class="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98]"
+              >
+                Continue
+                <UIcon name="i-heroicons-arrow-right" class="w-4 h-4" aria-hidden="true" />
+              </button>
+
+              <button
+                v-else
+                type="submit"
+                form="add-client-form"
+                :disabled="creating"
+                class="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98]"
+              >
+                <UIcon v-if="creating" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" aria-hidden="true" />
+                <template v-else>
+                  <UIcon name="i-heroicons-user-plus" class="w-4 h-4" aria-hidden="true" />
+                  Create Client
+                </template>
+              </button>
+            </div>
+
           </div>
         </div>
-
-        <form @submit.prevent="createClient" class="min-h-50 flex flex-col justify-between">
-
-          <!-- Step 1 -->
-          <div v-if="currentStep === 1" class="space-y-5 animate-in slide-in-from-right-8 fade-in duration-300">
-            <div>
-              <label class="block text-[10px] uppercase font-bold text-gray-500 mb-1">Client Name <span class="text-red-500">*</span></label>
-              <div class="relative">
-                <UIcon name="i-heroicons-building-office-2" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
-                <input v-model="newClient.name" type="text" autofocus required class="w-full bg-black/40 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:outline-none focus:border-primary placeholder-gray-700 transition-colors" placeholder="e.g. Acme Corp" />
-              </div>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-[10px] uppercase font-bold text-gray-500 mb-1">Category</label>
-                <div class="relative">
-                  <select v-model="newClient.category" class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary appearance-none cursor-pointer transition-colors">
-                    <option v-for="cat in categories" :key="cat" :value="cat" class="bg-secondary text-gray-300">{{ cat }}</option>
-                  </select>
-                  <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4 pointer-events-none" />
-                </div>
-              </div>
-              <div>
-                <label class="block text-[10px] uppercase font-bold text-gray-500 mb-1">Website</label>
-                <input v-model="newClient.website" type="url" class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary placeholder-gray-700 transition-colors" placeholder="https://..." />
-              </div>
-            </div>
-          </div>
-
-          <!-- Step 2 -->
-          <div v-if="currentStep === 2" class="space-y-5 animate-in slide-in-from-right-8 fade-in duration-300">
-            <div class="bg-primary/5 border border-primary/10 rounded-xl p-4 mb-4 flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-base flex items-center justify-center text-lg font-bold text-white border border-white/5">
-                {{ newClient.name.charAt(0).toUpperCase() }}
-              </div>
-              <div>
-                <p class="text-white font-bold text-sm">{{ newClient.name }}</p>
-                <p class="text-xs text-gray-500">{{ newClient.category }}</p>
-              </div>
-            </div>
-            <div>
-              <label class="block text-[10px] uppercase font-bold text-gray-500 mb-1">Contact Name</label>
-              <input v-model="newClient.contact_name" type="text" autofocus placeholder="Jane Doe" class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-sm text-white focus:border-primary focus:outline-none placeholder-gray-700 transition-colors" />
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-[10px] uppercase font-bold text-gray-500 mb-1">Email</label>
-                <input v-model="newClient.contact_email" type="email" placeholder="jane@acme.com" class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-sm text-white focus:border-primary focus:outline-none placeholder-gray-700 transition-colors" />
-              </div>
-              <div>
-                <label class="block text-[10px] uppercase font-bold text-gray-500 mb-1">Phone</label>
-                <input v-model="newClient.contact_phone" type="tel" placeholder="+234..." class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-sm text-white focus:border-primary focus:outline-none placeholder-gray-700 transition-colors" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Actions -->
-          <div class="flex gap-3 pt-8 mt-4 border-t border-white/5">
-            <button type="button" @click="currentStep === 1 ? closeModal() : currentStep--" class="px-6 py-3 rounded-lg text-gray-400 hover:text-white transition-colors font-medium text-sm">
-              {{ currentStep === 1 ? 'Cancel' : 'Back' }}
-            </button>
-            <button v-if="currentStep === 1" type="button" @click="currentStep++" :disabled="!canProceed" class="flex-1 bg-primary hover:bg-[#3d34d9] text-white px-4 py-3 rounded-lg font-bold shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all">
-              Next Step
-              <UIcon name="i-heroicons-arrow-right" class="w-4 h-4" />
-            </button>
-            <button v-else type="submit" :disabled="creating" class="flex-1 bg-primary hover:bg-[#3d34d9] text-white px-4 py-3 rounded-lg font-bold shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center gap-2 transition-all">
-              <UIcon v-if="creating" name="i-heroicons-arrow-path" class="w-5 h-5 animate-spin" />
-              <span v-else>Create Client</span>
-            </button>
-          </div>
-
-        </form>
-      </div>
-    </div>
+      </Transition>
+    </Teleport>
 
   </div>
 </template>
+
+<style scoped>
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 200ms ease;
+}
+.modal-enter-active .relative,
+.modal-leave-active .relative {
+  transition: transform 200ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+.modal-enter-from .relative {
+  transform: translateY(20px) scale(0.98);
+}
+@media (max-width: 639px) {
+  .modal-enter-from .relative {
+    transform: translateY(100%);
+  }
+}
+</style>

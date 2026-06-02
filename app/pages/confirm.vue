@@ -23,7 +23,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-base flex items-center justify-center font-sans">
+  <div class="min-h-screen bg-base flex items-center justify-center">
     <div class="text-center animate-in fade-in zoom-in-95 duration-700">
       <div class="relative w-20 h-20 mx-auto mb-6">
         <div class="absolute inset-0 border-4 border-primary/20 rounded-xl"></div>

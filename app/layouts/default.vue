@@ -6,14 +6,35 @@ const auth = useAuthStore()
 const user = useSupabaseUser()
 const { profile } = useUserProfile()
 
-// v-model:open is viewport-aware:
-// desktop → controls expanded / collapsed (icon) state
-// mobile  → controls modal/drawer open state
-const open = ref(true)
-const route = useRoute()
+// ── Responsive breakpoint detection ───────────────────────────────────────────
+const isMobile = ref(false)
 
+function updateBreakpoint() {
+  isMobile.value = window.innerWidth < 1024
+}
+
+onMounted(() => {
+  updateBreakpoint()
+  window.addEventListener('resize', updateBreakpoint)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateBreakpoint)
+})
+
+// ── Sidebar state ─────────────────────────────────────────────────────────────
+// On desktop, sidebar starts expanded; on mobile, closed.
+const open = ref(!isMobile.value)
+
+const route = useRoute()
 watch(() => route.path, () => {
-  if (window.innerWidth < 1024) open.value = false
+  if (isMobile.value) open.value = false
+})
+
+// Sync open state when breakpoint changes
+watch(isMobile, (mobile) => {
+  if (!mobile) open.value = true   // expand on desktop
+  else open.value = false          // close on mobile
 })
 
 const displayName = computed(() =>
@@ -54,14 +75,19 @@ function getNavItems(state: 'expanded' | 'collapsed'): NavigationMenuItem[] {
       icon:  'i-heroicons-folder-open',
       to:    '/projects',
     },
+    {
+      label: 'Onboarding',
+      icon:  'i-heroicons-clipboard-document-list',
+      to:    '/onboarding',
+    },
     ...(state === 'expanded'
       ? [{ type: 'label' as const, label: 'Quick Access' }]
       : []),
     {
-  label: 'Library',
-  icon:  'i-heroicons-book-open',
-  to:    '/library',
-},
+      label: 'Library',
+      icon:  'i-heroicons-book-open',
+      to:    '/library',
+    },
     {
       label: 'Retainers',
       icon:  'i-heroicons-banknotes',
@@ -77,31 +103,30 @@ function getNavItems(state: 'expanded' | 'collapsed'): NavigationMenuItem[] {
 </script>
 
 <template>
-  <div class="h-screen w-screen bg-base font-sans text-white flex flex-col overflow-hidden">
+  <div class="h-screen w-screen bg-base text-white flex flex-col overflow-hidden">
 
     <!-- Mobile-only top bar -->
     <header class="lg:hidden flex-none flex items-center justify-between p-4 bg-secondary border-b border-white/5 z-40">
       <NuxtLink to="/">
         <img src="/img/clientbaselogo-white.png" alt="Client Base OPS" class="h-16 w-auto object-contain" />
       </NuxtLink>
-      <UButton
-        icon="i-heroicons-bars-3-bottom-left"
-        color="neutral"
-        variant="ghost"
+      <button
+        class="p-2 text-slate-400 hover:text-white transition-colors"
         aria-label="Open menu"
-        class="text-gray-400 hover:text-white"
         @click="open = true"
-      />
+      >
+        <UIcon name="i-heroicons-bars-3-bottom-left" class="w-6 h-6" />
+      </button>
     </header>
 
     <!-- Sidebar + Main -->
     <div class="flex flex-1 overflow-hidden">
 
       <USidebar
-      rail
-      close
-      close-icon="i-heroicons-x-mark"
         v-model:open="open"
+        :overlay="isMobile"
+        :close="isMobile"
+        close-icon="i-heroicons-x-mark"
         collapsible="icon"
         :ui="{
           root: 'bg-secondary border-r border-white/5 shadow-2xl lg:shadow-none',
@@ -113,29 +138,41 @@ function getNavItems(state: 'expanded' | 'collapsed'): NavigationMenuItem[] {
         }"
       >
 
-        <!-- Logo -->
+        <!-- Logo + mobile close button -->
         <template #header>
-          <NuxtLink to="/" class="flex items-center justify-center w-full h-full">
-            <Transition name="logo" mode="out-in">
-              <img
-                v-if="open"
-                key="full"
-                src="/img/clientbaselogo-white.png"
-                alt="Client Base OPS"
-                class="h-16 w-auto object-contain"
-              />
-              <img
-                v-else
-                key="mini"
-                src="/img/clientbaselogo-min.png"
-                alt="Client Base"
-                class="h-16 w-auto object-contain drop-shadow-lg"
-              />
-            </Transition>
-          </NuxtLink>
+          <div class="flex items-center justify-between w-full h-full">
+            <NuxtLink to="/" class="flex items-center justify-center">
+              <Transition name="logo" mode="out-in">
+                <img
+                  v-if="open"
+                  key="full"
+                  src="/img/clientbaselogo-white.png"
+                  alt="Client Base OPS"
+                  class="h-16 w-auto object-contain"
+                />
+                <img
+                  v-else
+                  key="mini"
+                  src="/img/clientbaselogo-min.png"
+                  alt="Client Base"
+                  class="h-16 w-auto object-contain drop-shadow-lg"
+                />
+              </Transition>
+            </NuxtLink>
+
+            <!-- Close button (mobile only) -->
+            <button
+              v-if="isMobile"
+              class="p-2 text-slate-400 hover:text-white transition-colors"
+              aria-label="Close sidebar"
+              @click="open = false"
+            >
+              <UIcon name="i-heroicons-x-mark" class="w-5 h-5" />
+            </button>
+          </div>
         </template>
 
-        <!-- Navigation — direct child, no #default wrapper to avoid duplicate slot conflict -->
+        <!-- Navigation -->
         <UNavigationMenu
           :key="String(open)"
           :items="getNavItems(open ? 'expanded' : 'collapsed')"

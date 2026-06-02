@@ -217,7 +217,7 @@ const pendingCount = computed(() => retainers.value.filter(r => r.status === 'pe
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#0B0E14] text-white font-sans selection:bg-indigo-500/30 overflow-x-hidden">
+  <div class="min-h-screen bg-[#0B0E14] text-white  selection:bg-indigo-500/30 overflow-x-hidden">
     
     <!-- Navigation -->
     <nav class="fixed top-0 w-full z-50 border-b border-white/5 bg-[#0B0E14]/80 backdrop-blur-md">
