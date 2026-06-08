@@ -1,37 +1,53 @@
 <script setup lang="ts">
-definePageMeta({
-    layout: false
-})
+definePageMeta({ layout: false })
+
 const route = useRoute()
 const supabase = useSupabaseClient()
 
 const token = route.params.token as string
 const loading = ref(true)
 const project = ref<any>(null)
-const client = ref<any>(null)
 const files = ref<any[]>([])
 
 const fetchProject = async () => {
   loading.value = true
   try {
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*, clients(id, name, website)')
-      .eq('share_token', token)
-      .single()
+    // Use the secure function instead of a direct query
+    const { data, error } = await supabase.rpc('get_shared_project', {
+      p_share_token: token
+    })
 
     if (error) throw error
-    project.value = data
-    client.value = data?.clients || null
 
-    // Fetch files (public download via signed URL if needed)
-    const { data: fileData } = await supabase
-      .from('files')
-      .select('*')
-      .eq('project_id', data.id)
-      .order('created_at', { ascending: false })
-    files.value = fileData || []
+    if (data && data.length > 0) {
+      const row = data[0]
+      // Map the flat function result back to the shape the template expects
+      project.value = {
+        id: row.id,
+        name: row.name,
+        description: row.description,
+        status: row.status,
+        start_date: row.start_date,
+        end_date: row.end_date,
+        budget: row.budget,
+        currency: row.currency,
+        notes: row.notes,
+        clients: {
+          name: row.client_name,
+          website: row.client_website
+        }
+      }
+
+      // Fetch files via the secure function
+      const { data: fileData } = await supabase.rpc('get_shared_files', {
+        p_project_id: row.id
+      })
+      files.value = fileData || []
+    } else {
+      project.value = null
+    }
   } catch (e) {
+    console.error(e)
     project.value = null
   } finally {
     loading.value = false

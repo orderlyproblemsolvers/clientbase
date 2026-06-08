@@ -1,8 +1,8 @@
-// composables/useUserProfile.ts
 export const useUserProfile = () => {
-  const auth = useAuthStore()
+  const auth     = useAuthStore()
+  const supabase = useSupabaseClient()  // captured synchronously — always safe
+  const user     = useSupabaseUser()    // captured synchronously — always safe
 
-  // Expose the same shape as before so nothing breaks
   const profile = computed(() => ({
     full_name:  auth.profile.full_name,
     role:       auth.profile.role,
@@ -11,22 +11,19 @@ export const useUserProfile = () => {
     fetched:    auth.profileFetched,
   }))
 
-  // `fetch` kept for any page that still calls it manually
   const fetch = async () => {
-    const user     = useSupabaseUser()
-    const supabase = useSupabaseClient()
-
     let userId = user.value?.id
 
     if (!userId) {
-      const { data } = await supabase.auth.getSession()
-      userId = data.session?.user?.id
+      // getUser() instead of getSession() — fixes the security warning
+      const { data } = await supabase.auth.getUser()
+      userId = data.user?.id
     }
 
-    if (userId) await auth.fetchProfile(userId)
+    if (userId) await auth.fetchProfile(supabase, userId)
   }
 
-  const reset      = ()       => auth.resetProfile()
+  const reset      = () => auth.resetProfile()
   const setProfile = (data: Parameters<typeof auth.setProfile>[0]) =>
     auth.setProfile(data)
 
