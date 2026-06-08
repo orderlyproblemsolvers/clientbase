@@ -3,7 +3,8 @@ export default defineNuxtRouteMiddleware((to, from) => {
 
   const publicRoutes   = ['/login', '/signup', '/welcome', '/confirm']
   const isInvoicePrint = to.path.startsWith('/invoices/')
-  const isClientBrief  = to.path.startsWith('/brief/')   // ← add this
+  const isClientBrief  = to.path.startsWith('/brief/')  
+  const isProjectView  = to.path.startsWith('/view/')
 
   if (isInvoicePrint || isClientBrief) return
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+
 // ⚠️ All script logic remains exactly the same — no functional changes.
 const { $md } = useNuxtApp()
 const route   = useRoute()
@@ -43,6 +44,56 @@ const isPreviewMode  = ref(false)
 const briefSubmission = ref(null)
 const briefForm       = ref(null)
 
+// ── Share link ────────────────────────────────────────────────────────────────
+const shareToken = ref<string | null>(null)
+const generatingShareLink = ref(false)
+const copiedShareLink = ref(false)
+
+const generateShareLink = async () => {
+  if (shareToken.value) return // already generated
+  generatingShareLink.value = true
+  try {
+    let token: string | null = projectData.value?.share_token
+    if (!token) {
+      token = crypto.randomUUID()
+      const { error } = await supabase
+        .from('projects')
+        .update({ share_token: token, updated_at: new Date().toISOString() })
+        .eq('id', projectId.value)
+      if (error) throw error
+      projectData.value.share_token = token
+    }
+    shareToken.value = token
+  } catch (e: any) {
+    alert(e.message)
+  } finally {
+    generatingShareLink.value = false
+  }
+}
+
+const copyShareLink = () => {
+  if (!shareToken.value) return
+  const url = `${window.location.origin}/view/${shareToken.value}`
+  navigator.clipboard.writeText(url)
+  copiedShareLink.value = true
+  setTimeout(() => (copiedShareLink.value = false), 2000)
+}
+
+const revokeShareLink = async () => {
+  if (!confirm('Revoke the current share link? The old link will stop working.')) return
+  try {
+    const { error } = await supabase
+      .from('projects')
+      .update({ share_token: null, updated_at: new Date().toISOString() })
+      .eq('id', projectId.value)
+    if (error) throw error
+    projectData.value.share_token = null
+    shareToken.value = null
+  } catch (e: any) {
+    alert(e.message)
+  }
+}
+
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 const fetchData = async () => {
   // Guard early if no valid projectId exists
@@ -63,6 +114,9 @@ const fetchData = async () => {
     projectData.value = pData
     clientData.value  = pData?.clients
     notesDraft.value  = pData?.notes || ''
+
+    // Load existing share token
+    shareToken.value = pData?.share_token || null
 
     // Populate edit form
     editForm.value = {
@@ -364,15 +418,51 @@ onMounted(() => fetchData())
           </div>
         </div>
 
-        <!-- Edit button -->
-        <button
-          @click="showEditModal = true"
-          class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-white/5 hover:bg-white/8 border border-white/6 hover:border-white/10 transition-all duration-150 active:scale-[0.98] shrink-0"
-          aria-label="Edit project"
-        >
-          <UIcon name="i-heroicons-pencil-square" class="w-4 h-4" />
-          Edit Project
-        </button>
+        <!-- Header actions -->
+        <div class="flex items-center gap-2 shrink-0">
+          <!-- Share button -->
+          <button
+            v-if="!shareToken"
+            @click="generateShareLink"
+            :disabled="generatingShareLink"
+            class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-white/5 hover:bg-white/8 border border-white/6 hover:border-white/10 transition-all duration-150 active:scale-[0.98] shrink-0"
+            aria-label="Generate client share link"
+          >
+            <UIcon v-if="generatingShareLink" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
+            <UIcon v-else name="i-heroicons-share" class="w-4 h-4" />
+            Share with Client
+          </button>
+
+          <!-- Share link actions (when token exists) -->
+          <template v-else>
+            <button
+              @click="copyShareLink"
+              class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary/10 hover:bg-primary/20 border border-primary/20 hover:border-primary/30 transition-all duration-150 active:scale-[0.98] shrink-0"
+              aria-label="Copy client share link"
+            >
+              <UIcon :name="copiedShareLink ? 'i-heroicons-check' : 'i-heroicons-link'" class="w-4 h-4" />
+              {{ copiedShareLink ? 'Copied!' : 'Copy Client Link' }}
+            </button>
+            <button
+              @click="revokeShareLink"
+              class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-red-400 bg-white/5 hover:bg-red-500/10 border border-white/6 hover:border-red-500/20 transition-all duration-150 shrink-0"
+              aria-label="Revoke share link"
+              title="Revoke link"
+            >
+              <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
+            </button>
+          </template>
+
+          <!-- Edit button -->
+          <button
+            @click="showEditModal = true"
+            class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-white/5 hover:bg-white/8 border border-white/6 hover:border-white/10 transition-all duration-150 active:scale-[0.98] shrink-0"
+            aria-label="Edit project"
+          >
+            <UIcon name="i-heroicons-pencil-square" class="w-4 h-4" />
+            Edit Project
+          </button>
+        </div>
       </header>
 
       <!-- Project Meta Cards -->
