@@ -51,47 +51,6 @@ const getUserIdOrThrow = async () => {
   throw new Error("CRITICAL: User ID not found. You may be logged out.")
 }
 
-// --- ACTIONS ---
-
-const fetchProfile = async () => {
-  loading.value = true
-  try {
-    const userId = await getUserIdOrThrow()
-    
-    // Set email for display
-    if (user.value?.email) profile.value.email = user.value.email
-    
-    // Load Theme
-    if (process.client) {
-      const savedColor = localStorage.getItem('ops-primary-color')
-      if (savedColor) activeTheme.value = savedColor
-    }
-
-    const { data } = await client
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-      
-    if (data) {
-      profile.value.full_name = data.full_name
-      profile.value.role = data.role
-      profile.value.avatar_url = data.avatar_url
-      if (data.avatar_url) avatarPreview.value = data.avatar_url
-
-      // 🔥 SYNC GLOBAL STATE
-      setProfile({
-        full_name: data.full_name,
-        role: data.role,
-        avatar_url: data.avatar_url
-      })
-    }
-  } catch (e) {
-    console.log('Fetch Profile Info:', e)
-  }
-  loading.value = false
-}
-
 // 2. Handle File Upload (Cloudinary + Auto-Save + Global Sync)
 const handleAvatarChange = async (e: any) => {
   const file = e.target.files[0]

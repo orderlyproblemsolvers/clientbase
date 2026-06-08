@@ -271,6 +271,9 @@ const statusConfig = {
   archived: { label: 'Archived', dot: 'bg-slate-600',   badge: 'text-slate-500  bg-slate-600/10  border-slate-600/20'  },
 }
 
+const formatBudget = (amount: number, currency: string) =>
+  new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(amount)
+
 const tabs = [
   { key: 'secrets',    label: 'Secrets',    icon: 'i-heroicons-key' },
   { key: 'notes',      label: 'Notes',      icon: 'i-heroicons-document-text' },

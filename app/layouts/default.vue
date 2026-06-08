@@ -1,19 +1,9 @@
 <script setup lang="ts">
-import { watchEffect } from 'vue'
 import type { NavigationMenuItem } from '@nuxt/ui'
 import { useAuthStore } from '~/stores/auth'
 
 const auth = useAuthStore()
 const user = useSupabaseUser()
-const { profile, fetch: fetchProfile } = useUserProfile()   // <-- destructure fetch
-
-// ── Fetch profile automatically when user becomes available ─────────────
-watchEffect(() => {
-  // Only fetch when we have a valid user ID
-  if (user.value && user.value.id && user.value.id !== 'undefined') {
-    fetchProfile()
-  }
-})
 
 // ── Responsive breakpoint detection ───────────────────────────────────────────
 const isMobile = ref(false)
@@ -44,23 +34,14 @@ watch(isMobile, (mobile) => {
   else open.value = false
 })
 
-const displayName = computed(() =>
-  profile.value.full_name ||
-  user.value?.user_metadata?.full_name ||
-  user.value?.email ||
-  'User'
-)
+// ── Display values — read directly from store ────────────────────────────────
+const displayName = computed(() => auth.displayName)
+const displayRole = computed(() => auth.displayRole)
+const displayInitial = computed(() => auth.displayInitial)
 
-const displayRole = computed(() =>
-  profile.value.role ||
-  user.value?.user_metadata?.role ||
-  'Team Member'
-)
-
-const displayInitial = computed(() => {
-  const name = displayName.value
-  return name ? name.charAt(0).toUpperCase() : 'U'
-})
+// Profile-specific reads (used in the footer)
+const avatarUrl      = computed(() => auth.profile.avatar_url)
+const profileLoading = computed(() => auth.profileLoading)
 
 function getNavItems(state: 'expanded' | 'collapsed'): NavigationMenuItem[] {
   return [
@@ -197,61 +178,62 @@ function getNavItems(state: 'expanded' | 'collapsed'): NavigationMenuItem[] {
         />
 
         <!-- User Profile + Logout -->
-        <template #footer>
-          <div v-if="user">
+<!-- Replace the footer section inside USidebar #footer -->
+<template #footer>
+  <div v-if="user">
 
-            <!-- Loading -->
-            <div
-              v-if="profile.loading"
-              class="p-4 flex items-center gap-2"
-              :class="!open ? 'justify-center' : ''"
-            >
-              <UIcon name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin text-primary shrink-0" />
-              <span v-if="open" class="text-xs text-gray-400">Loading profile...</span>
-            </div>
+    <!-- Loading -->
+    <div
+      v-if="profileLoading"
+      class="p-4 flex items-center gap-2"
+      :class="!open ? 'justify-center' : ''"
+    >
+      <UIcon name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin text-primary shrink-0" />
+      <span v-if="open" class="text-xs text-gray-400">Loading profile...</span>
+    </div>
 
-            <!-- Profile -->
-            <div
-              v-else
-              class="flex items-center gap-3 p-4"
-              :class="!open ? 'justify-center px-2' : ''"
-            >
-              <img
-                v-if="profile.avatar_url"
-                :src="profile.avatar_url"
-                alt="Profile"
-                class="w-8 h-8 rounded-full object-cover border-2 border-primary/50 shrink-0 shadow-lg"
-              />
-              <div
-                v-else
-                class="w-8 h-8 rounded-full bg-primary flex items-center justify-center font-bold text-xs text-white shrink-0 shadow-lg"
-              >
-                {{ displayInitial }}
-              </div>
+    <!-- Profile -->
+    <div
+      v-else
+      class="flex items-center gap-3 p-4"
+      :class="!open ? 'justify-center px-2' : ''"
+    >
+      <img
+        v-if="avatarUrl"
+        :src="avatarUrl"
+        alt="Profile"
+        class="w-8 h-8 rounded-full object-cover border-2 border-primary/50 shrink-0 shadow-lg"
+      />
+      <div
+        v-else
+        class="w-8 h-8 rounded-full bg-primary flex items-center justify-center font-bold text-xs text-white shrink-0 shadow-lg"
+      >
+        {{ displayInitial }}
+      </div>
 
-              <Transition name="fade">
-                <div v-if="open" class="truncate min-w-0">
-                  <p class="text-xs font-bold text-white truncate">{{ displayName }}</p>
-                  <p class="text-[9px] text-gray-500 font-medium truncate">{{ displayRole }}</p>
-                </div>
-              </Transition>
-            </div>
+      <Transition name="fade">
+        <div v-if="open" class="truncate min-w-0">
+          <p class="text-xs font-bold text-white truncate">{{ displayName }}</p>
+          <p class="text-[9px] text-gray-500 font-medium truncate">{{ displayRole }}</p>
+        </div>
+      </Transition>
+    </div>
 
-            <!-- Logout -->
-            <div class="border-t border-white/5">
-              <button
-                class="w-full px-4 py-3 text-[10px] uppercase font-bold text-red-400 hover:bg-red-500/10 transition-all flex items-center gap-2"
-                :class="!open ? 'justify-center' : ''"
-                :title="!open ? 'Logout' : ''"
-                @click="auth.logout"
-              >
-                <UIcon name="i-heroicons-arrow-left-on-rectangle" class="w-4 h-4 shrink-0" />
-                <span v-if="open">Logout</span>
-              </button>
-            </div>
+    <!-- Logout -->
+    <div class="border-t border-white/5">
+      <button
+        @click="auth.logout"
+        class="w-full px-4 py-3 text-[10px] uppercase font-bold text-red-400 hover:bg-red-500/10 transition-all flex items-center gap-2"
+        :class="!open ? 'justify-center' : ''"
+        :title="!open ? 'Logout' : ''"
+      >
+        <UIcon name="i-heroicons-arrow-left-on-rectangle" class="w-4 h-4 shrink-0" />
+        <span v-if="open">Logout</span>
+      </button>
+    </div>
 
-          </div>
-        </template>
+  </div>
+</template>
 
       </USidebar>
 
