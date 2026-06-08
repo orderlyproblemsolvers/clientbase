@@ -342,9 +342,8 @@ onMounted(() => fetchData())
 
 <template>
   <div class="min-h-screen bg-base font-sans">
-
     <!-- Breadcrumb -->
-    <nav class="flex items-center gap-1.5 text-sm text-slate-500 mb-6" aria-label="Breadcrumb">
+    <nav class="flex items-center gap-1.5 text-sm text-slate-500 mb-8" aria-label="Breadcrumb">
       <NuxtLink to="/" class="flex items-center gap-1.5 hover:text-slate-300 transition-colors duration-150">
         <UIcon name="i-heroicons-squares-2x2" class="w-4 h-4" />
         <span>Dashboard</span>
@@ -356,42 +355,48 @@ onMounted(() => fetchData())
     </nav>
 
     <!-- Loading -->
-    <div v-if="loading" class="space-y-4">
+    <div v-if="loading" class="space-y-6">
       <div class="h-10 w-64 bg-white/5 animate-pulse rounded-lg"></div>
       <div class="h-96 bg-white/5 animate-pulse rounded-2xl"></div>
     </div>
 
     <div v-else-if="formData" class="space-y-8">
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <h1 class="text-2xl font-bold text-white tracking-tight">{{ formData.title }}</h1>
-          <span
-            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border"
-            :class="statusConfig[formData.status]"
+      <!-- ===== Hero Header ===== -->
+      <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/[0.04] via-white/[0.02] to-transparent border border-white/6 p-6 md:p-8">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none"></div>
+        <div class="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <h1 class="text-2xl font-bold text-white tracking-tight">{{ formData.title }}</h1>
+            <span
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border"
+              :class="statusConfig[formData.status]"
+            >
+              <span class="w-1.5 h-1.5 rounded-full" :class="{
+                'bg-slate-400': formData.status === 'draft',
+                'bg-blue-400': formData.status === 'sent',
+                'bg-emerald-400': formData.status === 'completed',
+              }" aria-hidden="true"></span>
+              {{ formData.status }}
+            </span>
+          </div>
+          <button
+            @click="saveForm"
+            :disabled="saving"
+            class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98] disabled:opacity-50 shrink-0"
           >
-            <span class="w-1.5 h-1.5 rounded-full" :class="{
-              'bg-slate-400': formData.status === 'draft',
-              'bg-blue-400': formData.status === 'sent',
-              'bg-emerald-400': formData.status === 'completed',
-            }" aria-hidden="true"></span>
-            {{ formData.status }}
-          </span>
+            <UIcon v-if="saving" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
+            <UIcon v-else name="i-heroicons-check" class="w-4 h-4" />
+            Save Form
+          </button>
         </div>
-        <button
-          @click="saveForm"
-          :disabled="saving"
-          class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98] disabled:opacity-50 shrink-0"
-        >
-          <UIcon v-if="saving" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
-          <UIcon v-else name="i-heroicons-check" class="w-4 h-4" />
-          Save Form
-        </button>
+        <p v-if="formData.description" class="relative z-10 text-slate-400 text-sm mt-4 max-w-2xl leading-relaxed">
+          {{ formData.description }}
+        </p>
       </div>
 
       <!-- Tabs -->
-      <div class="bg-white/5 p-1 rounded-xl flex gap-1 overflow-x-auto max-w-xl">
+      <div class="bg-white/5 p-1 rounded-xl flex gap-1 overflow-x-auto">
         <button
           v-for="tab in [
             { id: 'build',       label: 'Build',       icon: 'i-heroicons-wrench-screwdriver' },
@@ -402,7 +407,7 @@ onMounted(() => fetchData())
           :key="tab.id"
           @click="activeTab = tab.id as any"
           :class="[
-            'flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all duration-150 flex items-center justify-center gap-1.5 whitespace-nowrap',
+            'flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all duration-150 flex items-center justify-center gap-1.5 whitespace-nowrap',
             activeTab === tab.id
               ? 'bg-primary text-white shadow-lg shadow-primary/20'
               : 'text-slate-400 hover:text-white hover:bg-white/5'
@@ -411,8 +416,8 @@ onMounted(() => fetchData())
           :aria-selected="activeTab === tab.id"
           role="tab"
         >
-          <UIcon :name="tab.icon" class="w-3.5 h-3.5" />
-          {{ tab.label }}
+          <UIcon :name="tab.icon" class="w-4 h-4" />
+          <span class="hidden sm:inline">{{ tab.label }}</span>
           <span v-if="tab.id === 'submissions' && submissions.length" class="bg-white/20 px-1.5 py-0.5 rounded text-[10px] tabular-nums">
             {{ submissions.length }}
           </span>
@@ -421,14 +426,13 @@ onMounted(() => fetchData())
 
       <!-- ── BUILD TAB ───────────────────────────────────────────────────── -->
       <div v-if="activeTab === 'build'" class="space-y-6">
-
-        <!-- Form meta -->
-        <div class="bg-white/3 border border-white/6 rounded-2xl p-5 space-y-4">
+        <!-- Form Settings -->
+        <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-5 space-y-4">
           <h3 class="text-sm font-semibold text-white">Form Settings</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="space-y-1.5">
               <label for="form-title" class="block text-xs font-semibold text-slate-400">Title</label>
-              <input id="form-title" v-model="formData.title" type="text" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
+              <input id="form-title" v-model="formData.title" type="text" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
             </div>
             <div class="space-y-1.5">
               <label for="form-desc" class="block text-xs font-semibold text-slate-400">Description (visible to client)</label>
@@ -437,9 +441,9 @@ onMounted(() => fetchData())
             <div class="space-y-1.5">
               <label for="form-client" class="block text-xs font-semibold text-slate-400">Linked Client</label>
               <div class="relative">
-                <select id="form-client" v-model="formData.client_id" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
-                  <option class="bg-black hover:bg-gray-900" value="">None</option>
-                  <option class="bg-black hover:bg-gray-900" v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
+                <select id="form-client" v-model="formData.client_id" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+                  <option class="bg-black text-white" value="">None</option>
+                  <option class="bg-black text-white" v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
                 <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
               </div>
@@ -447,9 +451,9 @@ onMounted(() => fetchData())
             <div class="space-y-1.5">
               <label for="form-project" class="block text-xs font-semibold text-slate-400">Linked Project</label>
               <div class="relative">
-                <select id="form-project" v-model="formData.project_id" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
-                  <option class="bg-black hover:bg-gray-900" value="">None</option>
-                  <option class="bg-black hover:bg-gray-900" v-for="p in clientProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
+                <select id="form-project" v-model="formData.project_id" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+                  <option class="bg-black text-white" value="">None</option>
+                  <option class="bg-black text-white" v-for="p in clientProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
                 </select>
                 <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
               </div>
@@ -457,8 +461,8 @@ onMounted(() => fetchData())
           </div>
         </div>
 
-        <!-- Fields -->
-        <div class="bg-white/3 border border-white/6 rounded-2xl overflow-hidden">
+        <!-- Fields List -->
+        <div class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
           <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
             <h3 class="text-sm font-semibold text-white">
               Fields
@@ -473,7 +477,6 @@ onMounted(() => fetchData())
             </button>
           </div>
 
-          <!-- Empty fields -->
           <div v-if="fields.length === 0" class="p-12 text-center">
             <div class="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
               <UIcon name="i-heroicons-rectangle-stack" class="w-6 h-6 text-slate-600" />
@@ -482,19 +485,16 @@ onMounted(() => fetchData())
             <p class="text-xs text-slate-500">Add your first field above.</p>
           </div>
 
-          <!-- Field list -->
           <div v-else class="divide-y divide-white/5">
             <div
               v-for="(field, idx) in fields"
               :key="field.id"
-              class="flex items-center gap-4 px-5 py-3.5 hover:bg-white/3 transition-colors duration-150 group"
+              class="flex items-center gap-4 px-5 py-3.5 hover:bg-white/[0.03] transition-colors duration-150 group"
             >
-              <!-- Type icon -->
               <div class="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
                 <UIcon :name="fieldTypeConfig(field.type).icon" class="w-4 h-4 text-slate-400" />
               </div>
 
-              <!-- Label + type -->
               <div class="flex-1 min-w-0">
                 <p class="text-white text-sm font-medium flex items-center gap-2 truncate">
                   {{ field.label || '(no label)' }}
@@ -507,7 +507,6 @@ onMounted(() => fetchData())
                 </p>
               </div>
 
-              <!-- Controls -->
               <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150 shrink-0">
                 <button @click="moveFieldUp(idx)" :disabled="idx === 0" class="p-1.5 rounded-lg text-slate-600 hover:text-white disabled:opacity-20 transition-colors" aria-label="Move up">
                   <UIcon name="i-heroicons-chevron-up" class="w-3.5 h-3.5" />
@@ -525,12 +524,10 @@ onMounted(() => fetchData())
             </div>
           </div>
         </div>
-
       </div>
 
       <!-- ── FILL TAB ─────────────────────────────────────────────────────── -->
       <div v-else-if="activeTab === 'fill'" class="animate-in fade-in duration-300">
-
         <div v-if="fillDone" class="text-center py-16">
           <div class="w-16 h-16 bg-emerald-400/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <UIcon name="i-heroicons-check-circle" class="w-8 h-8 text-emerald-400" />
@@ -568,13 +565,13 @@ onMounted(() => fetchData())
                 v-model="fillAnswers[field.id]"
                 :placeholder="field.placeholder"
                 rows="4"
-                class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none transition-all duration-150"
+                class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none transition-all duration-150"
               ></textarea>
 
               <div v-else-if="field.type === 'select'" class="relative">
-                <select v-model="fillAnswers[field.id]" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
-                  <option value="">Select...</option>
-                  <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
+                <select v-model="fillAnswers[field.id]" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+                  <option class="bg-black text-white" value="">Select...</option>
+                  <option class="bg-black text-white" v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
                 </select>
                 <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
               </div>
@@ -584,7 +581,7 @@ onMounted(() => fetchData())
                 v-model="fillAnswers[field.id]"
                 :type="field.type === 'file' ? 'url' : field.type"
                 :placeholder="field.type === 'file' ? 'Paste file/drive link here' : field.placeholder"
-                class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150"
+                class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150"
               />
             </div>
 
@@ -604,25 +601,22 @@ onMounted(() => fetchData())
 
       <!-- ── SHARE TAB ───────────────────────────────────────────────────── -->
       <div v-else-if="activeTab === 'share'" class="animate-in fade-in duration-300 max-w-xl space-y-6">
-
-        <div class="bg-white/3 border border-white/6 rounded-2xl p-6 space-y-4">
+        <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-6 space-y-4">
           <h3 class="text-sm font-semibold text-white">Client Link</h3>
           <p class="text-slate-400 text-sm">
             Share this link with your client. They can fill the form without creating a ClientBase account.
           </p>
 
-          <!-- Link display -->
-          <div class="flex items-center gap-3 bg-white/4 rounded-xl p-3 border border-white/8">
+          <div class="flex items-center gap-3 bg-white/[0.04] border border-white/8 rounded-xl p-3">
             <p class="flex-1 text-slate-300 text-sm font-mono truncate">{{ clientLink }}</p>
             <button
               @click="copyClientLink"
-              class="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-primary hover:bg-primary/90 text-white transition-all duration-150"
+              class="shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold bg-primary hover:bg-primary/90 text-white transition-all duration-150"
             >
               Copy Link
             </button>
           </div>
 
-          <!-- Status alerts -->
           <div v-if="formData.status === 'draft'" class="bg-amber-400/5 border border-amber-400/10 rounded-2xl p-4">
             <p class="text-amber-400 text-xs font-medium mb-3">
               This form is still in Draft. Once you share the link, mark it as Sent so you can track it.
@@ -646,8 +640,7 @@ onMounted(() => fetchData())
           </div>
         </div>
 
-        <!-- Preview link -->
-        <div class="bg-white/3 border border-white/6 rounded-2xl p-6">
+        <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-6">
           <h3 class="text-sm font-semibold text-white mb-2">Preview as Client</h3>
           <p class="text-slate-500 text-sm mb-4">See exactly what your client will see when they open the link.</p>
           <a
@@ -663,7 +656,6 @@ onMounted(() => fetchData())
 
       <!-- ── SUBMISSIONS TAB ─────────────────────────────────────────────── -->
       <div v-else-if="activeTab === 'submissions'" class="animate-in fade-in duration-300">
-
         <div v-if="submissions.length === 0" class="text-center py-16 border border-dashed border-white/8 rounded-2xl">
           <div class="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
             <UIcon name="i-heroicons-inbox" class="w-6 h-6 text-slate-600" />
@@ -676,7 +668,7 @@ onMounted(() => fetchData())
           <div
             v-for="sub in submissions"
             :key="sub.id"
-            class="bg-white/3 border border-white/6 hover:border-white/10 rounded-2xl p-5 transition-all duration-150"
+            class="bg-white/[0.03] border border-white/6 hover:border-white/10 rounded-2xl p-5 transition-all duration-150"
           >
             <div class="flex items-start justify-between mb-4">
               <div>
@@ -694,15 +686,14 @@ onMounted(() => fetchData())
               </button>
             </div>
 
-            <!-- Responses -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div
                 v-for="field in fields"
                 :key="field.id"
-                class="bg-white/4 rounded-xl p-3"
+                class="bg-white/[0.04] border border-white/6 rounded-xl p-3"
               >
                 <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">{{ field.label }}</p>
-                <p class="text-slate-300 text-sm wrap-break-word">
+                <p class="text-slate-300 text-sm break-words">
                   {{ sub.responses[field.id] || '—' }}
                 </p>
               </div>
@@ -713,7 +704,7 @@ onMounted(() => fetchData())
 
     </div>
 
-    <!-- ── Add/Edit Field Modal ────────────────────────────────────────────── -->
+    <!-- Add/Edit Field Modal -->
     <Teleport to="body">
       <Transition name="modal">
         <div
@@ -725,12 +716,10 @@ onMounted(() => fetchData())
         >
           <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="showAddField = false" aria-hidden="true"></div>
           <div class="relative w-full sm:max-w-md bg-[#0d1525] border border-white/8 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh]">
-            <!-- Mobile drag indicator -->
             <div class="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
               <div class="w-10 h-1 rounded-full bg-white/10"></div>
             </div>
 
-            <!-- Header -->
             <div class="px-6 py-5 border-b border-white/5 flex items-center justify-between shrink-0">
               <div>
                 <h2 id="field-modal-title" class="text-base font-bold text-white">{{ editingField ? 'Edit Field' : 'Add Field' }}</h2>
@@ -741,11 +730,8 @@ onMounted(() => fetchData())
               </button>
             </div>
 
-            <!-- Scrollable form body -->
             <div class="overflow-y-auto flex-1 px-6 py-5">
               <div class="space-y-5">
-
-                <!-- Field type -->
                 <div>
                   <label class="block text-xs font-semibold text-slate-400 mb-2">Field Type</label>
                   <div class="grid grid-cols-3 gap-2">
@@ -765,24 +751,21 @@ onMounted(() => fetchData())
                   </div>
                 </div>
 
-                <!-- Label -->
                 <div class="space-y-1.5">
                   <label for="field-label" class="block text-xs font-semibold text-slate-400">Label <span class="text-red-400">*</span></label>
-                  <input id="field-label" v-model="fieldDraft.label" type="text" placeholder="e.g. Budget, Company Name..." class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
+                  <input id="field-label" v-model="fieldDraft.label" type="text" placeholder="e.g. Budget, Company Name..." class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
                 </div>
 
-                <!-- Placeholder -->
                 <div class="space-y-1.5">
                   <label for="field-placeholder" class="block text-xs font-semibold text-slate-400">Placeholder</label>
-                  <input id="field-placeholder" v-model="fieldDraft.placeholder" type="text" placeholder="Hint shown inside the field..." class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
+                  <input id="field-placeholder" v-model="fieldDraft.placeholder" type="text" placeholder="Hint shown inside the field..." class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
                 </div>
 
-                <!-- Options (select only) -->
                 <div v-if="fieldDraft.type === 'select'" class="space-y-3">
                   <label class="block text-xs font-semibold text-slate-400">Options</label>
                   <div class="space-y-2">
                     <div v-for="(opt, i) in fieldDraft.options" :key="i" class="flex items-center gap-2">
-                      <span class="flex-1 bg-white/4 px-3 py-2 rounded-xl text-white text-sm">{{ opt }}</span>
+                      <span class="flex-1 bg-white/[0.04] px-3 py-2 rounded-xl text-white text-sm">{{ opt }}</span>
                       <button type="button" @click="removeOption(i)" class="p-1.5 rounded-lg text-slate-600 hover:text-red-400 transition-colors">
                         <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
                       </button>
@@ -793,7 +776,7 @@ onMounted(() => fetchData())
                       v-model="optionInput"
                       type="text"
                       placeholder="Add option..."
-                      class="flex-1 bg-white/4 border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150"
+                      class="flex-1 bg-white/[0.04] border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150"
                       @keydown.enter.prevent="addOption"
                     />
                     <button type="button" @click="addOption" class="px-3 py-2.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/8 border border-white/6 text-slate-400 hover:text-white transition-all">
@@ -802,7 +785,6 @@ onMounted(() => fetchData())
                   </div>
                 </div>
 
-                <!-- Required toggle -->
                 <div class="flex items-center gap-3">
                   <button
                     type="button"
@@ -817,11 +799,8 @@ onMounted(() => fetchData())
                   </label>
                 </div>
 
-                <!-- File field config -->
                 <div v-if="fieldDraft.type === 'file'" class="space-y-4 pt-2 border-t border-white/5">
                   <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">File Field Settings</p>
-
-                  <!-- Max files -->
                   <div>
                     <label class="block text-xs font-medium text-slate-400 mb-1.5">
                       Max number of files the client can upload
@@ -841,8 +820,6 @@ onMounted(() => fetchData())
                       <span class="text-slate-500 text-xs">file{{ (fieldDraft.maxFiles || 1) !== 1 ? 's' : '' }} maximum</span>
                     </div>
                   </div>
-
-                  <!-- Accepted file types -->
                   <div>
                     <label class="block text-xs font-medium text-slate-400 mb-2">Accepted file types</label>
                     <div class="grid grid-cols-2 gap-2">
@@ -877,7 +854,6 @@ onMounted(() => fetchData())
               </div>
             </div>
 
-            <!-- Footer actions -->
             <div class="px-6 py-4 border-t border-white/5 shrink-0 flex gap-2.5">
               <button
                 type="button"
@@ -914,7 +890,6 @@ onMounted(() => fetchData())
 </template>
 
 <style scoped>
-/* Modal transitions (exact match with all other pages) */
 .modal-enter-active,
 .modal-leave-active {
   transition: opacity 200ms ease;

@@ -1,30 +1,29 @@
 <script setup lang="ts">
-// 1. Import the shared composable
 const { setProfile } = useUserProfile()
 
 const client = useSupabaseClient()
-const user = useSupabaseUser()
+const user   = useSupabaseUser()
 const config = useRuntimeConfig()
 
-// --- CONFIGURATION ---
 const CLOUDINARY_CLOUD_NAME = config.public.CloudinaryCloudName
-const CLOUDINARY_PRESET = config.public.CloudinaryPreset
+const CLOUDINARY_PRESET     = config.public.CloudinaryPreset
 
-// --- STATE ---
-const loading = ref(true)
-const saving = ref(false)
-const activeTab = ref('profile')
+// ── State ─────────────────────────────────────────────────────────────────────
+const loading       = ref(true)
+const saving        = ref(false)
+const activeTab     = ref('profile')
 const avatarPreview = ref<string | null>(null)
-const toast = ref({ show: false, message: '', type: 'success' })
+const toast         = ref({ show: false, message: '', type: 'success' })
 
 const profile = ref({
-  full_name: '',
-  role: 'Developer',
-  email: '',
-  avatar_url: '' as string | null
+  full_name:  '',
+  role:       'Developer',
+  email:      '',
+  avatar_url: '' as string | null,
 })
 
 const passwordForm = ref({ new_password: '', confirm_password: '' })
+
 const themes = [
   { name: 'Ops Indigo',   hex: '#4d48e5' },
   { name: 'Cyber Blue',   hex: '#0ea5e9' },
@@ -34,148 +33,168 @@ const themes = [
 ]
 const activeTheme = ref('#4d48e5')
 
-// --- HELPERS ---
-
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const showToast = (msg: string, type = 'success') => {
   toast.value = { show: true, message: msg, type }
   setTimeout(() => toast.value.show = false, 3000)
 }
 
-// 🔥 AGGRESSIVE ID RETRIEVAL (Kept from previous fix) 🔥
-const getUserIdOrThrow = async () => {
+// Use getUser() — contacts the Supabase server to validate the session
+const getUserId = async (): Promise<string> => {
   if (user.value?.id) return user.value.id
-  const { data: sessionData } = await client.auth.getSession()
-  if (sessionData.session?.user?.id) return sessionData.session.user.id
-  const { data: userData } = await client.auth.getUser()
-  if (userData.user?.id) return userData.user.id
-  throw new Error("CRITICAL: User ID not found. You may be logged out.")
+  const { data } = await client.auth.getUser()
+  if (data.user?.id) return data.user.id
+  throw new Error('Not authenticated — please log in again.')
 }
 
-// 2. Handle File Upload (Cloudinary + Auto-Save + Global Sync)
+// ── Fetch profile (was missing, called in onMounted) ──────────────────────────
+const fetchProfile = async () => {
+  loading.value = true
+  try {
+    const userId = await getUserId()
+
+    if (user.value?.email) profile.value.email = user.value.email
+
+    // Restore saved theme
+    if (process.client) {
+      const saved = localStorage.getItem('ops-primary-color')
+      if (saved) activeTheme.value = saved
+    }
+
+    const { data, error } = await client
+      .from('profiles')
+      .select('full_name, role, avatar_url')
+      .eq('id', userId)
+      .single()
+
+    if (error) throw error
+
+    if (data) {
+      profile.value.full_name  = data.full_name  || ''
+      profile.value.role       = data.role       || 'Developer'
+      profile.value.avatar_url = data.avatar_url || null
+      if (data.avatar_url) avatarPreview.value = data.avatar_url
+
+      // Keep the global sidebar state in sync
+      setProfile({
+        full_name:  data.full_name,
+        role:       data.role,
+        avatar_url: data.avatar_url,
+      })
+    }
+  } catch (e: any) {
+    console.error('[settings] Profile fetch failed:', e.message)
+  } finally {
+    loading.value = false
+  }
+}
+
+// ── Avatar upload ─────────────────────────────────────────────────────────────
 const handleAvatarChange = async (e: any) => {
   const file = e.target.files[0]
   if (!file) return
-  
+
   avatarPreview.value = URL.createObjectURL(file)
   saving.value = true
-  
+
   try {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('upload_preset', CLOUDINARY_PRESET)
 
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
-      method: 'POST',
-      body: formData
-    })
-
+    const res  = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+      { method: 'POST', body: formData }
+    )
     const data = await res.json()
     if (!res.ok) throw new Error(data.error?.message || 'Upload failed')
-    
+
     const newAvatarUrl = data.secure_url
     profile.value.avatar_url = newAvatarUrl
-    
-    const userId = await getUserIdOrThrow() 
 
-    const updates = {
-      id: userId,
+    const userId = await getUserId()
+    const { error } = await client.from('profiles').upsert({
+      id:         userId,
       avatar_url: newAvatarUrl,
+      full_name:  profile.value.full_name,
+      role:       profile.value.role,
       updated_at: new Date(),
-      full_name: profile.value.full_name, 
-      role: profile.value.role
-    }
+    })
+    if (error) throw error
 
-    const { error: dbError } = await client.from('profiles').upsert(updates)
-    if (dbError) throw dbError
-
-    // 🔥 SYNC GLOBAL STATE
     setProfile({ avatar_url: newAvatarUrl })
-
-    showToast('Avatar saved successfully!', 'success')
-    
+    showToast('Avatar saved!')
   } catch (err: any) {
     showToast(err.message, 'error')
-    avatarPreview.value = null 
+    avatarPreview.value = profile.value.avatar_url // revert to saved
   } finally {
     saving.value = false
   }
 }
 
-// 3. Update Profile Text
+// ── Update profile text ───────────────────────────────────────────────────────
 const updateProfile = async () => {
   saving.value = true
   try {
-    const userId = await getUserIdOrThrow()
-
-    const updates = {
-      id: userId,
-      full_name: profile.value.full_name,
-      role: profile.value.role,
+    const userId = await getUserId()
+    const { error } = await client.from('profiles').upsert({
+      id:         userId,
+      full_name:  profile.value.full_name,
+      role:       profile.value.role,
       avatar_url: profile.value.avatar_url,
       updated_at: new Date(),
-    }
-
-    const { error } = await client.from('profiles').upsert(updates)
-    if (error) throw error
-    
-    // 🔥 SYNC GLOBAL STATE
-    setProfile({
-      full_name: profile.value.full_name,
-      role: profile.value.role,
-      avatar_url: profile.value.avatar_url
     })
-    
-    showToast('Profile updated successfully!')
-  } catch (error: any) {
-    showToast(error.message, 'error')
+    if (error) throw error
+
+    setProfile({
+      full_name:  profile.value.full_name,
+      role:       profile.value.role,
+      avatar_url: profile.value.avatar_url,
+    })
+    showToast('Profile updated!')
+  } catch (err: any) {
+    showToast(err.message, 'error')
   } finally {
     saving.value = false
   }
 }
 
-// 4. Update Password
+// ── Password ──────────────────────────────────────────────────────────────────
 const updatePassword = async () => {
-  // Basic validation
-  if (passwordForm.value.new_password.length < 8) {
-    return showToast("Password must be at least 8 characters.", 'error')
-  }
-  if (passwordForm.value.new_password !== passwordForm.value.confirm_password) {
-    return showToast("Passwords do not match!", 'error')
-  }
-  
-  saving.value = true
-  const { error } = await client.auth.updateUser({ 
-    password: passwordForm.value.new_password 
-  })
+  if (passwordForm.value.new_password.length < 8)
+    return showToast('Password must be at least 8 characters.', 'error')
+  if (passwordForm.value.new_password !== passwordForm.value.confirm_password)
+    return showToast('Passwords do not match.', 'error')
 
+  saving.value = true
+  const { error } = await client.auth.updateUser({ password: passwordForm.value.new_password })
   saving.value = false
+
   if (error) showToast(error.message, 'error')
   else {
-    showToast("Password updated successfully!")
+    showToast('Password updated!')
     passwordForm.value = { new_password: '', confirm_password: '' }
   }
 }
 
-// 5. Theme Logic
+// ── Theme ─────────────────────────────────────────────────────────────────────
 const setTheme = (hex: string) => {
   activeTheme.value = hex
   if (process.client) {
     document.documentElement.style.setProperty('--color-primary', hex)
     localStorage.setItem('ops-primary-color', hex)
   }
-  showToast(`Theme changed to ${themes.find(t => t.hex === hex)?.name}`)
+  showToast(`Theme: ${themes.find(t => t.hex === hex)?.name}`)
 }
 
-// 6. Sign Out Everywhere
+// ── Sign out everywhere ───────────────────────────────────────────────────────
 const signOutEverywhere = async () => {
-  if(!confirm("Are you sure? You will be logged out of all devices.")) return
+  if (!confirm('You will be logged out of all devices. Continue?')) return
   await client.auth.signOut({ scope: 'global' })
   navigateTo('/login')
 }
 
-onMounted(() => {
-  fetchProfile()
-})
+onMounted(() => fetchProfile())
 </script>
 
 <template>

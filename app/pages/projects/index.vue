@@ -28,7 +28,6 @@ const hasActiveFilters = computed(() =>
   searchQuery.value || statusFilter.value !== 'all' || clientFilter.value !== 'all'
 )
 
-// Group projects by status for the kanban-style summary
 const statusCounts = computed(() => {
   const counts: Record<string, number> = {}
   for (const p of projects.value) {
@@ -75,7 +74,6 @@ const statusConfig: Record<string, { label: string; dot: string; badge: string }
   archived: { label: 'Archived', dot: 'bg-slate-600',   badge: 'text-slate-500  bg-slate-500/10  border-slate-500/20'  },
 }
 
-// Status pipeline — the natural order a project moves through
 const statusPipeline = ['lead', 'proposal', 'active', 'review', 'complete', 'archived']
 
 const formatDate = (d: string) =>
@@ -96,41 +94,51 @@ onMounted(() => fetchData())
 </script>
 
 <template>
-  <div class="min-h-screen bg-base ">
-
-    <!-- ── Page header ─────────────────────────────────────────────────────── -->
-    <header class="mb-7">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+  <div class="min-h-screen bg-base font-sans">
+    <!-- ===== Hero Header ===== -->
+    <div class="relative mb-8 rounded-2xl bg-gradient-to-r from-primary/5 to-transparent border border-white/6 p-5 md:p-6">
+      <div class="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div>
-          <h1 class="text-2xl font-bold text-white tracking-tight">Projects</h1>
-          <p class="text-xs text-slate-500 mt-1">
+          <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
+            <UIcon name="i-heroicons-folder-open" class="w-8 h-8 text-primary" />
+            Projects
+          </h1>
+          <p class="text-slate-400 mt-2 text-sm">
             {{ projects.length }} project{{ projects.length !== 1 ? 's' : '' }} across {{ clients.length }} client{{ clients.length !== 1 ? 's' : '' }}
           </p>
         </div>
-
-        <!-- Quick stats chips — scannable at a glance -->
-        <div v-if="!loading && projects.length > 0" class="flex items-center gap-2 flex-wrap">
-          <button
-            v-for="key in statusPipeline.filter(s => statusCounts[s])"
-            :key="key"
-            @click="statusFilter = statusFilter === key ? 'all' : key"
-            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-all duration-150"
-            :class="[
-              statusConfig[key].badge,
-              statusFilter === key ? 'ring-1 ring-current ring-offset-1 ring-offset-[var(--color-base,#0a0f1e)]' : 'hover:brightness-125'
-            ]"
-          >
-            <span class="w-1.5 h-1.5 rounded-full" :class="statusConfig[key].dot" aria-hidden="true"></span>
-            {{ statusConfig[key].label }}
-            <span class="opacity-60 tabular-nums">{{ statusCounts[key] }}</span>
-          </button>
-        </div>
       </div>
-    </header>
 
-    <!-- ── Filter bar ──────────────────────────────────────────────────────── -->
+      <!-- Status filter chips (inside hero card) -->
+      <div v-if="!loading && projects.length > 0" class="flex gap-2 mt-5 pt-5 border-t border-white/5 overflow-x-auto">
+        <button
+          @click="statusFilter = 'all'"
+          class="px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wide transition-all border whitespace-nowrap flex items-center gap-1.5"
+          :class="statusFilter === 'all'
+            ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
+            : 'bg-white/5 text-slate-400 border-white/6 hover:border-white/10 hover:text-white'"
+        >
+          All
+          <span class="opacity-60 tabular-nums">{{ projects.length }}</span>
+        </button>
+        <button
+          v-for="key in statusPipeline.filter(s => statusCounts[s])"
+          :key="key"
+          @click="statusFilter = statusFilter === key ? 'all' : key"
+          class="px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wide transition-all border whitespace-nowrap flex items-center gap-2"
+          :class="statusFilter === key
+            ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
+            : 'bg-white/5 text-slate-400 border-white/6 hover:border-white/10 hover:text-white'"
+        >
+          <span class="w-1.5 h-1.5 rounded-full" :class="statusConfig[key].dot" aria-hidden="true"></span>
+          {{ statusConfig[key].label }}
+          <span class="opacity-60 tabular-nums">{{ statusCounts[key] }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ===== Filter Bar ===== -->
     <div class="flex flex-col sm:flex-row gap-2.5 mb-6">
-
       <!-- Search -->
       <div class="relative flex-1">
         <UIcon
@@ -147,28 +155,15 @@ onMounted(() => fetchData())
         />
       </div>
 
-      <!-- Status -->
-      <div class="relative sm:w-40">
-        <select
-          v-model="statusFilter"
-          aria-label="Filter by status"
-          class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-primary/40 focus:outline-none appearance-none cursor-pointer transition-all duration-150 pr-8"
-        >
-          <option value="all">All Statuses</option>
-          <option v-for="s in statusPipeline" :key="s" :value="s">{{ statusConfig[s].label }}</option>
-        </select>
-        <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" aria-hidden="true" />
-      </div>
-
-      <!-- Client -->
+      <!-- Client filter -->
       <div class="relative sm:w-44">
         <select
           v-model="clientFilter"
           aria-label="Filter by client"
           class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-primary/40 focus:outline-none appearance-none cursor-pointer transition-all duration-150 pr-8"
         >
-          <option value="all">All Clients</option>
-          <option v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
+          <option class="bg-black text-white" value="all">All Clients</option>
+          <option class="bg-black text-white" v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
         </select>
         <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" aria-hidden="true" />
       </div>
@@ -178,17 +173,16 @@ onMounted(() => fetchData())
         <button
           v-if="hasActiveFilters"
           @click="clearFilters"
-          class="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all duration-150 shrink-0"
+          class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all duration-150 shrink-0"
           aria-label="Clear all filters"
         >
           <UIcon name="i-heroicons-x-mark" class="w-4 h-4" aria-hidden="true" />
           <span class="hidden sm:inline">Clear</span>
         </button>
       </Transition>
-
     </div>
 
-    <!-- ── Results meta ────────────────────────────────────────────────────── -->
+    <!-- Results meta -->
     <div v-if="!loading && hasActiveFilters && projects.length > 0" class="flex items-center justify-between mb-4">
       <p class="text-xs text-slate-500">
         Showing <span class="text-white font-semibold">{{ filtered.length }}</span> of {{ projects.length }} projects
@@ -198,12 +192,12 @@ onMounted(() => fetchData())
       </p>
     </div>
 
-    <!-- ── Loading skeleton ────────────────────────────────────────────────── -->
+    <!-- Loading skeleton -->
     <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <div v-for="i in 6" :key="i" class="h-44 rounded-2xl bg-white/5 animate-pulse"></div>
     </div>
 
-    <!-- ── Empty state ─────────────────────────────────────────────────────── -->
+    <!-- Empty state -->
     <div v-else-if="filtered.length === 0" class="border border-dashed border-white/8 rounded-2xl py-16 text-center">
       <div class="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
         <UIcon
@@ -217,7 +211,7 @@ onMounted(() => fetchData())
       </p>
       <p class="text-xs text-slate-600 mb-5 max-w-xs mx-auto">
         {{ hasActiveFilters
-          ? 'Try adjusting the search, status, or client filter.'
+          ? 'Try adjusting the search or client filter.'
           : 'Projects are created from a client page. Open a client and add their first project.' }}
       </p>
       <button
@@ -238,7 +232,7 @@ onMounted(() => fetchData())
       </NuxtLink>
     </div>
 
-    <!-- ── Project grid ────────────────────────────────────────────────────── -->
+    <!-- Project grid -->
     <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <NuxtLink
         v-for="p in filtered"
@@ -246,7 +240,7 @@ onMounted(() => fetchData())
         :to="`/projects/${p.id}`"
         class="group bg-white/[0.03] hover:bg-white/[0.055] border border-white/6 hover:border-white/10 rounded-2xl p-5 transition-all duration-200 block flex flex-col"
       >
-        <!-- Top: status + arrow -->
+        <!-- Status badge + arrow -->
         <div class="flex items-center justify-between mb-3.5">
           <span
             class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border"

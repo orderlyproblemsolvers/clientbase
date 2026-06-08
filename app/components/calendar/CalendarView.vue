@@ -1,7 +1,7 @@
 <template>
-  <div class="animate-in fade-in duration-300 ">
-    
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+  <div class="animate-in fade-in duration-300">
+    <!-- ===== Month Navigation ===== -->
+    <div class="flex items-center justify-between gap-4 mb-6">
       <div class="flex items-center gap-2">
         <button
           @click="prevMonth"
@@ -10,11 +10,9 @@
         >
           <UIcon name="i-heroicons-chevron-left" class="w-5 h-5" />
         </button>
-        
         <h2 class="text-base font-semibold text-white w-44 text-center tracking-tight">
           {{ monthLabel }}
         </h2>
-        
         <button
           @click="nextMonth"
           class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/[0.03] hover:bg-white/[0.07] text-slate-400 hover:text-white transition-all duration-150 border border-white/[0.06] active:scale-95"
@@ -26,77 +24,83 @@
 
       <button
         @click="goToToday"
-        class="h-10 px-4 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] text-slate-300 hover:text-white border border-white/[0.06] text-xs font-medium tracking-wide transition-all duration-150 active:scale-95 self-start sm:self-auto"
+        class="h-10 px-4 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] text-slate-300 hover:text-white border border-white/[0.06] text-xs font-medium tracking-wide transition-all duration-150 active:scale-95"
       >
         Today
       </button>
     </div>
 
-    <div class="flex items-center gap-x-4 gap-y-2 mb-6 flex-wrap pb-4 border-b border-white/[0.04]">
-      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium tracking-wide">
+    <!-- ===== Legend ===== -->
+    <div class="flex items-center gap-x-4 gap-y-2 mb-6 flex-wrap pb-4 border-b border-white/[0.04] overflow-x-auto">
+      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium whitespace-nowrap">
         <span class="w-2 h-2 rounded-full bg-blue-400"></span> Milestone
       </div>
-      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium tracking-wide">
+      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium whitespace-nowrap">
         <span class="w-2 h-2 rounded-full bg-rose-400"></span> Task (High)
       </div>
-      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium tracking-wide">
+      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium whitespace-nowrap">
         <span class="w-2 h-2 rounded-full bg-amber-400"></span> Task (Med)
       </div>
-      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium tracking-wide">
+      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium whitespace-nowrap">
         <span class="w-2 h-2 rounded-full bg-slate-400"></span> Task (Low)
       </div>
-      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium tracking-wide">
+      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium whitespace-nowrap">
         <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Project Start
       </div>
-      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium tracking-wide">
+      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium whitespace-nowrap">
         <span class="w-2 h-2 rounded-full bg-violet-400"></span> Project End
       </div>
-      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium tracking-wide">
+      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium whitespace-nowrap">
         <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Invoice Due
       </div>
-      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium tracking-wide">
+      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium whitespace-nowrap">
         <span class="w-2 h-2 rounded-full bg-rose-500"></span> Invoice Overdue
       </div>
     </div>
 
+    <!-- ===== Calendar + Sidebar (responsive flex) ===== -->
     <div class="flex flex-col xl:flex-row gap-6 items-start">
-
+      <!-- Calendar Grid (flex-1) -->
       <div class="flex-1 min-w-0 w-full">
-        
+        <!-- Loading skeleton -->
         <div v-if="loading" class="grid grid-cols-7 gap-1">
           <div
-            v-for="i in 42" 
+            v-for="i in 42"
             :key="i"
-            class="h-24 bg-white/[0.02] border border-white/[0.04] animate-pulse rounded-xl"
+            class="h-20 sm:h-24 lg:h-28 bg-white/[0.02] border border-white/[0.04] animate-pulse rounded-xl"
           ></div>
         </div>
 
         <template v-else>
+          <!-- Day names -->
           <div class="grid grid-cols-7 mb-2">
             <div
               v-for="day in ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']"
               :key="day"
               class="py-1 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500"
             >
-              {{ day }}
+              <span class="hidden sm:inline">{{ day }}</span>
+              <span class="sm:hidden">{{ day.charAt(0) }}</span>
             </div>
           </div>
 
+          <!-- Calendar Cells -->
           <div class="grid grid-cols-7 gap-1 bg-white/[0.01] p-1 rounded-2xl border border-white/[0.04]">
             <div
               v-for="(day, idx) in calendarDays"
               :key="idx"
               @click="selectDay(day.date)"
-              class="min-h-[105px] rounded-xl p-2 cursor-pointer transition-all duration-150 relative flex flex-col justify-between group select-none border"
+              class="relative flex flex-col justify-between rounded-xl p-1.5 sm:p-2 cursor-pointer transition-all duration-150 group select-none border min-h-[70px] sm:min-h-[90px] lg:min-h-[105px]"
               :class="[
                 day.currentMonth ? 'bg-white/[0.02] hover:bg-white/[0.05]' : 'bg-transparent opacity-35 hover:opacity-60',
                 isSelected(day.date) ? '!bg-primary/[0.04] ring-1 ring-primary/40 border-primary/30' : 'border-white/[0.04]',
                 isToday(day.date) ? '!border-primary/50 bg-white/[0.04]' : '',
               ]"
             >
-              <div class="flex justify-between items-start mb-1.5">
+              <!-- Date number -->
+              <div class="flex justify-between items-start mb-1">
                 <span
-                  class="flex items-center justify-center w-6 h-6 rounded-lg text-xs font-semibold transition-colors"
+                  class="flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-lg text-[10px] sm:text-xs font-semibold transition-colors"
                   :class="[
                     isToday(day.date)
                       ? 'bg-primary text-white shadow-sm shadow-primary/20'
@@ -108,17 +112,18 @@
                   {{ day.date.getDate() }}
                 </span>
 
-                <div 
-                  v-if="(itemsByDate[toKey(day.date)] || []).length > 3" 
-                  class="w-1.5 h-1.5 rounded-full bg-slate-500 opacity-60 mt-2"
+                <div
+                  v-if="(itemsByDate[toKey(day.date)] || []).length > 3"
+                  class="w-1.5 h-1.5 rounded-full bg-slate-500 opacity-60 mt-1"
                 ></div>
               </div>
 
-              <div class="space-y-1 flex-1 flex flex-col justify-end">
+              <!-- Event chips (compact) -->
+              <div class="space-y-0.5 flex-1 flex flex-col justify-end">
                 <template v-for="(item, i) in (itemsByDate[toKey(day.date)] || [])" :key="item.id">
                   <div
                     v-if="i < 3"
-                    class="flex items-center gap-1.5 px-1.5 py-0.5 rounded-md text-[10px] font-medium truncate border transition-all duration-100"
+                    class="flex items-center gap-1 px-1 py-0.5 rounded-md text-[9px] sm:text-[10px] font-medium truncate border transition-all duration-100"
                     :class="chipClass(item)"
                   >
                     <span class="w-1 h-1 rounded-full shrink-0" :class="dotClass(item)"></span>
@@ -130,7 +135,7 @@
 
                 <div
                   v-if="(itemsByDate[toKey(day.date)] || []).length > 3"
-                  class="text-[9px] text-slate-500 font-semibold px-1 mt-0.5"
+                  class="text-[8px] sm:text-[9px] text-slate-500 font-semibold px-1 mt-0.5"
                 >
                   +{{ (itemsByDate[toKey(day.date)] || []).length - 3 }} more
                 </div>
@@ -140,49 +145,45 @@
         </template>
       </div>
 
-      <Transition
-        enter-active-class="transition duration-200 ease-out"
-        enter-from-class="opacity-0 translate-x-4"
-        enter-to-class="opacity-100 translate-x-0"
-        leave-active-class="transition duration-150 ease-in"
-        leave-from-class="opacity-100 translate-x-0"
-        leave-to-class="opacity-0 translate-x-4"
-      >
+      <!-- Selected Day Panel (inline sidebar / below on mobile) -->
+      <Transition name="panel">
         <div
           v-if="selectedDay"
-          class="w-full xl:w-80 shrink-0 bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 self-start sticky top-4 backdrop-blur-md"
+          class="w-full xl:w-80 shrink-0 bg-white/[0.03] border border-white/6 rounded-2xl p-5 self-start"
         >
-          <div class="flex items-start justify-between mb-4 pb-3 border-b border-white/[0.04]">
+          <!-- Header -->
+          <div class="flex items-start justify-between mb-4 pb-3 border-b border-white/5">
             <div>
-              <p class="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-0.5">Selected Date</p>
-              <h3 class="text-white font-semibold text-sm tracking-tight">{{ selectedDayLabel }}</h3>
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">Selected Date</p>
+              <h3 class="text-white font-semibold text-sm">{{ selectedDayLabel }}</h3>
             </div>
             <button
               @click="selectedDay = null"
-              class="text-slate-500 hover:text-slate-200 hover:bg-white/[0.05] rounded-lg transition-all p-1"
+              class="w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/8 transition-all"
               aria-label="Dismiss panel"
             >
-              <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
+              <UIcon name="i-heroicons-x-mark" class="w-5 h-5" />
             </button>
           </div>
 
+          <!-- Items list -->
           <div
             v-if="selectedDayItems.length === 0"
-            class="py-12 text-center text-slate-500 text-xs italic flex flex-col items-center justify-center gap-2"
+            class="py-12 text-center text-slate-500 text-xs flex flex-col items-center gap-2"
           >
             <UIcon name="i-heroicons-calendar" class="w-6 h-6 text-slate-600" />
-            No activities mapped to this day.
+            <p>No activities on this day.</p>
           </div>
 
-          <div v-else class="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1 scalar-scrollbar">
+          <div v-else class="space-y-3 max-h-[60vh] xl:max-h-[70vh] overflow-y-auto pr-1 custom-scrollbar">
             <div
               v-for="item in selectedDayItems"
               :key="item.id"
-              class="bg-white/[0.01] border border-white/[0.04] rounded-xl p-3 hover:border-white/[0.08] hover:bg-white/[0.02] transition-all duration-150"
+              class="bg-white/[0.03] border border-white/6 rounded-xl p-4 hover:border-white/10 transition-all duration-150"
             >
               <div class="flex items-center gap-2 mb-2">
                 <span
-                  class="flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] uppercase font-bold border tracking-wider"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase border"
                   :class="panelChipClass(item)"
                 >
                   <UIcon :name="itemIcon(item)" class="w-3 h-3 shrink-0" />
@@ -191,18 +192,18 @@
               </div>
 
               <p
-                class="text-xs font-medium mb-1.5 leading-normal"
-                :class="[statusDoneClass(item) ? 'line-through text-slate-500' : 'text-slate-200']"
+                class="text-sm font-medium mb-2"
+                :class="[statusDoneClass(item) ? 'line-through text-slate-500' : 'text-white']"
               >
                 {{ item.title }}
               </p>
 
-              <p v-if="item.milestoneTitle" class="text-[11px] text-slate-500 mb-2 flex items-center gap-1.5 bg-white/[0.02] px-2 py-1 rounded-md border border-white/[0.02]">
+              <p v-if="item.milestoneTitle" class="text-xs text-slate-500 mb-2 flex items-center gap-1.5 bg-white/[0.02] px-2 py-1 rounded-lg border border-white/[0.02]">
                 <UIcon name="i-heroicons-flag" class="w-3 h-3 text-slate-400" />
                 <span class="truncate">{{ item.milestoneTitle }}</span>
               </p>
 
-              <div v-if="item.projectName || item.clientName" class="flex items-center gap-x-2 gap-y-1 mt-2 flex-wrap text-[11px]">
+              <div v-if="item.projectName || item.clientName" class="flex items-center gap-x-2 gap-y-1 mt-2 flex-wrap text-xs">
                 <NuxtLink
                   v-if="item.projectId"
                   :to="`/projects/${item.projectId}`"
@@ -210,11 +211,9 @@
                   @click.stop
                 >
                   <UIcon name="i-heroicons-folder-open" class="w-3 h-3 text-slate-500" />
-                  <span class="truncate max-w-[110px]">{{ item.projectName }}</span>
+                  <span class="truncate max-w-[120px]">{{ item.projectName }}</span>
                 </NuxtLink>
-                
-                <span v-if="item.projectName && item.clientName" class="text-white/[0.08] font-bold">·</span>
-                
+                <span v-if="item.projectName && item.clientName" class="text-slate-600">·</span>
                 <NuxtLink
                   v-if="item.clientId"
                   :to="`/clients/${item.clientId}`"
@@ -222,16 +221,16 @@
                   @click.stop
                 >
                   <UIcon name="i-heroicons-building-office-2" class="w-3 h-3 text-slate-500" />
-                  <span class="truncate max-w-[110px]">{{ item.clientName }}</span>
+                  <span class="truncate max-w-[120px]">{{ item.clientName }}</span>
                 </NuxtLink>
               </div>
 
-              <div v-if="item.type === 'invoice_due' && item.amount" class="mt-2.5 pt-2 border-t border-white/[0.04] flex items-center justify-between">
+              <div v-if="item.type === 'invoice_due' && item.amount" class="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
                 <span class="text-[10px] text-slate-500 flex items-center gap-1">
                   <UIcon name="i-heroicons-paper-clip" class="w-3 h-3" />
                   {{ item.invoiceNumber }}
                 </span>
-                <span class="font-mono text-xs font-semibold tracking-tight" :class="item.status === 'overdue' ? 'text-rose-400' : 'text-emerald-400'">
+                <span class="font-mono text-xs font-semibold" :class="item.status === 'overdue' ? 'text-rose-400' : 'text-emerald-400'">
                   {{ new Intl.NumberFormat('en-NG', { style: 'currency', currency: item.currency || 'NGN', maximumFractionDigits: 0 }).format(item.amount) }}
                 </span>
               </div>
@@ -241,22 +240,24 @@
                 class="mt-2 flex items-center gap-1 text-[10px] text-emerald-400 font-medium"
               >
                 <UIcon name="i-heroicons-check-circle" class="w-3.5 h-3.5" />
-                Action Closed
+                Completed
               </div>
             </div>
           </div>
 
-          <p class="text-[10px] text-slate-500 font-medium mt-4 text-center tracking-tight">
-            {{ selectedDayItems.length }} scheduled event{{ selectedDayItems.length !== 1 ? 's' : '' }} on this timeline
-          </p>
+          <!-- Footer count -->
+          <div class="mt-4 pt-3 border-t border-white/5 text-center text-[10px] text-slate-500 font-medium">
+            {{ selectedDayItems.length }} event{{ selectedDayItems.length !== 1 ? 's' : '' }}
+          </div>
         </div>
       </Transition>
-
     </div>
   </div>
 </template>
 
 <script setup>
+// ── ENTIRE SCRIPT LOGIC REMAINS EXACTLY THE SAME ── //
+// (copied from original for completeness)
 import { ref, computed, onMounted } from 'vue'
 
 const props = defineProps({
@@ -268,22 +269,18 @@ const props = defineProps({
 
 const supabase = useSupabaseClient()
 
-// ── STATE CHANNELS ────────────────────────────────────────────────────────────
 const loading = ref(true)
 const currentDate = ref(new Date())
 const selectedDay = ref(null)
 
-// Raw collections loaded from datastore layers
 const milestones = ref([])
 const tasks = ref([])
 const projects = ref([])
 const invoices = ref([])
 
-// ── DATA ACQUISITION LAYER ────────────────────────────────────────────────────
 const fetchData = async () => {
   loading.value = true
   try {
-    // Milestones with active timeline definitions
     let mQuery = supabase
       .from('milestones')
       .select('id, title, due_date, status, project_id, projects(id, name, clients(id, name))')
@@ -292,7 +289,6 @@ const fetchData = async () => {
     const { data: mData } = await mQuery
     milestones.value = mData || []
 
-    // Core execution tasks mapped to absolute deadlines
     let tQuery = supabase
       .from('tasks')
       .select('id, title, due_date, status, priority, project_id, milestone_id, milestones(id, title, projects(id, name, clients(id, name)))')
@@ -301,7 +297,6 @@ const fetchData = async () => {
     const { data: tData } = await tQuery
     tasks.value = tData || []
 
-    // High-level institutional initiatives lifecycle steps
     let pQuery = supabase
       .from('projects')
       .select('id, name, start_date, end_date, clients(id, name)')
@@ -310,7 +305,6 @@ const fetchData = async () => {
     const { data: pData } = await pQuery
     projects.value = pData || []
 
-    // Accounts receivable pipeline values
     let iQuery = supabase
       .from('retainers')
       .select('id, title, invoice_number, amount, currency, status, due_date, clients(id, name), invoice_items(*)')
@@ -321,17 +315,14 @@ const fetchData = async () => {
     invoices.value = iData || []
 
   } catch (e) {
-    console.error('ClientBase Calendar Engine Fetch Failure:', e)
+    console.error('Calendar fetch error:', e)
   } finally {
     loading.value = false
   }
 }
 
-// ── CALENDAR ITEM NORMALISED COMPOSITION ─────────────────────────────────────
 const allItems = computed(() => {
   const items = []
-
-  // Normalise milestones to item interface mapping
   milestones.value.forEach(m => {
     items.push({
       id: `milestone-${m.id}`,
@@ -345,8 +336,6 @@ const allItems = computed(() => {
       clientName: m.projects?.clients?.name,
     })
   })
-
-  // Normalise individual operational tasks
   tasks.value.forEach(t => {
     items.push({
       id: `task-${t.id}`,
@@ -362,8 +351,6 @@ const allItems = computed(() => {
       milestoneTitle: t.milestones?.title,
     })
   })
-
-  // Normalise lifecycle tracking limits for explicit project paths
   projects.value.forEach(p => {
     if (p.start_date) {
       items.push({
@@ -392,13 +379,10 @@ const allItems = computed(() => {
       })
     }
   })
-
-  // Normalise financial collection obligations with transactional item reductions
   invoices.value.forEach(inv => {
     const total = inv.invoice_items?.length
       ? inv.invoice_items.reduce((s, i) => s + Number(i.quantity) * Number(i.unit_rate), 0)
       : Number(inv.amount)
-
     items.push({
       id: `invoice-${inv.id}`,
       date: inv.due_date,
@@ -412,11 +396,9 @@ const allItems = computed(() => {
       currency: inv.currency,
     })
   })
-
   return items
 })
 
-// Group structural tokens matching unique absolute date key indexes
 const itemsByDate = computed(() => {
   const map = {}
   allItems.value.forEach(item => {
@@ -426,7 +408,6 @@ const itemsByDate = computed(() => {
   return map
 })
 
-// ── CALENDAR MATRIX GENERATION EDGE COMPUTED LOGIC ───────────────────────────
 const calendarDays = computed(() => {
   const year = currentDate.value.getFullYear()
   const month = currentDate.value.getMonth()
@@ -434,27 +415,19 @@ const calendarDays = computed(() => {
   const lastDay = new Date(year, month + 1, 0)
   const startPad = firstDay.getDay()
   const days = []
-
-  // Pre-pad matrix with remaining trail records from previous months
   for (let i = startPad - 1; i >= 0; i--) {
     days.push({ date: new Date(year, month, -i), currentMonth: false })
   }
-
-  // Inject localized targets for actual calendar layout
   for (let d = 1; d <= lastDay.getDate(); d++) {
     days.push({ date: new Date(year, month, d), currentMonth: true })
   }
-
-  // Post-pad calculation arrays to maintain strict geometric 42-cell alignment blocks
   const remaining = 42 - days.length
   for (let d = 1; d <= remaining; d++) {
     days.push({ date: new Date(year, month + 1, d), currentMonth: false })
   }
-
   return days
 })
 
-// ── UTILITY HELPERS & FORMATTING METHODS ──────────────────────────────────────
 const toKey = (date) => {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
@@ -501,7 +474,6 @@ const selectedDayLabel = computed(() => {
     .toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 })
 
-// ── THEME DESIGN STATE SPECIFICATIONS (CLEAN GEOMETRIC PAIRINGS) ──────────────
 const dotClass = (item) => {
   if (item.type === 'milestone') return 'bg-blue-400'
   if (item.type === 'project_start') return 'bg-emerald-400'
@@ -578,17 +550,26 @@ onMounted(() => fetchData())
 </script>
 
 <style scoped>
-.scalar-scrollbar::-webkit-scrollbar {
+/* Panel transition (fade + subtle scale) */
+.panel-enter-active,
+.panel-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.panel-enter-from,
+.panel-leave-to {
+  opacity: 0;
+  transform: scale(0.98);
+}
+
+/* Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
-.scalar-scrollbar::-webkit-scrollbar-track {
+.custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
-.scalar-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.05);
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 999px;
-}
-.scalar-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.1);
 }
 </style>

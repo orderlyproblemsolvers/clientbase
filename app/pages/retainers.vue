@@ -358,71 +358,83 @@ onMounted(() => fetchData())
 
 <template>
   <div class="min-h-screen bg-base font-sans">
-
-    <!-- Header -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8">
-      <div>
-        <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
-          <UIcon name="i-heroicons-banknotes" class="w-8 h-8 text-primary" />
-          Billing & Retainers
-        </h1>
-        <p class="text-slate-400 mt-2 text-sm">Manage invoices, retainers, and payment schedules.</p>
+    <!-- ===== Hero Header ===== -->
+    <div class="relative mb-8 rounded-2xl bg-gradient-to-r from-primary/5 to-transparent border border-white/6 p-5 md:p-6">
+      <div class="flex flex-col md:flex-row justify-between md:items-center gap-4">
+        <div>
+          <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
+            <UIcon name="i-heroicons-banknotes" class="w-8 h-8 text-primary" />
+            Billing & Retainers
+          </h1>
+          <p class="text-slate-400 mt-2 text-sm max-w-lg">Manage invoices, retainers, and payment schedules.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <button
+            @click="showTemplatePanel = true"
+            class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all duration-150"
+          >
+            <UIcon name="i-heroicons-document-duplicate" class="w-4 h-4" />
+            Templates
+          </button>
+          <button
+            @click="resetForm(); showCreateModal = true"
+            class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98]"
+          >
+            <UIcon name="i-heroicons-plus" class="w-4 h-4" />
+            Create Invoice
+          </button>
+        </div>
       </div>
-      <div class="flex items-center gap-3">
-        <button
-          @click="showTemplatePanel = true"
-          class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all duration-150"
-        >
-          <UIcon name="i-heroicons-document-duplicate" class="w-4 h-4" />
-          Templates
-        </button>
-        <button
-          @click="resetForm(); showCreateModal = true"
-          class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98]"
-        >
-          <UIcon name="i-heroicons-plus" class="w-4 h-4" />
-          Create Invoice
-        </button>
-      </div>
-    </div>
 
-    <!-- Stats -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-      <div class="bg-white/3 border border-white/6 rounded-2xl p-5">
-        <div class="flex items-start justify-between mb-3">
-          <div class="w-8 h-8 rounded-xl bg-emerald-400/10 flex items-center justify-center">
+      <!-- Stats Row (inside hero card) -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/5">
+        <!-- Revenue -->
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-emerald-400/10 flex items-center justify-center shrink-0">
             <UIcon name="i-heroicons-banknotes" class="w-4 h-4 text-emerald-400" />
           </div>
+          <div>
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">Revenue</p>
+            <p class="text-lg font-bold text-white tabular-nums">{{ fmt(stats.revenue) }}</p>
+          </div>
         </div>
-        <p class="text-2xl font-bold text-white tabular-nums">{{ fmt(stats.revenue) }}</p>
-        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mt-1">Revenue (Paid)</p>
-      </div>
-      <button @click="filterStatus = 'pending'" class="bg-white/3 border border-white/6 rounded-2xl p-5 text-left hover:bg-white/[0.05] transition-colors duration-150">
-        <div class="flex items-start justify-between mb-3">
-          <div class="w-8 h-8 rounded-xl bg-amber-400/10 flex items-center justify-center">
+
+        <!-- Outstanding -->
+        <button @click="filterStatus = 'pending'" class="flex items-center gap-3 text-left hover:opacity-80 transition-opacity">
+          <div class="w-9 h-9 rounded-xl bg-amber-400/10 flex items-center justify-center shrink-0">
             <UIcon name="i-heroicons-clock" class="w-4 h-4 text-amber-400" />
           </div>
-        </div>
-        <p class="text-2xl font-bold text-amber-400 tabular-nums">{{ fmt(stats.outstanding) }}</p>
-        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mt-1">Outstanding</p>
-      </button>
-      <button @click="filterStatus = 'overdue'" class="rounded-2xl p-5 text-left transition-colors duration-150" :class="stats.overdueCount > 0 ? 'bg-red-500/[0.06] border border-red-500/15 hover:bg-red-500/10' : 'bg-white/3 border border-white/6 hover:bg-white/[0.05]'">
-        <div class="flex items-start justify-between mb-3">
-          <div class="w-8 h-8 rounded-xl flex items-center justify-center" :class="stats.overdueCount > 0 ? 'bg-red-400/15' : 'bg-slate-400/10'">
-            <UIcon name="i-heroicons-exclamation-triangle" class="w-4 h-4" :class="stats.overdueCount > 0 ? 'text-red-400' : 'text-slate-400'" />
+          <div>
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">Outstanding</p>
+            <p class="text-lg font-bold text-amber-400 tabular-nums">{{ fmt(stats.outstanding) }}</p>
           </div>
-        </div>
-        <p class="text-2xl font-bold tabular-nums" :class="stats.overdueCount > 0 ? 'text-red-400' : 'text-white'">{{ stats.overdueCount }}</p>
-        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mt-1">Overdue</p>
-      </button>
-      <div class="bg-white/3 border border-white/6 rounded-2xl p-5">
-        <div class="flex items-start justify-between mb-3">
-          <div class="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+        </button>
+
+        <!-- Overdue -->
+        <button @click="filterStatus = 'overdue'" class="flex items-center gap-3 text-left hover:opacity-80 transition-opacity">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+               :class="stats.overdueCount > 0 ? 'bg-red-400/15' : 'bg-slate-400/10'">
+            <UIcon name="i-heroicons-exclamation-triangle" class="w-4 h-4"
+                   :class="stats.overdueCount > 0 ? 'text-red-400' : 'text-slate-400'" />
+          </div>
+          <div>
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">Overdue</p>
+            <p class="text-lg font-bold tabular-nums" :class="stats.overdueCount > 0 ? 'text-red-400' : 'text-white'">
+              {{ stats.overdueCount }}
+            </p>
+          </div>
+        </button>
+
+        <!-- Active Clients -->
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
             <UIcon name="i-heroicons-users" class="w-4 h-4 text-primary" />
           </div>
+          <div>
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">Active Clients</p>
+            <p class="text-lg font-bold text-primary tabular-nums">{{ stats.activeClients }}</p>
+          </div>
         </div>
-        <p class="text-2xl font-bold text-primary tabular-nums">{{ stats.activeClients }}</p>
-        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mt-1">Active Clients</p>
       </div>
     </div>
 
@@ -437,7 +449,7 @@ onMounted(() => fetchData())
           v-model="searchQuery"
           type="search"
           placeholder="Search by client, description, or invoice number..."
-          class="w-full bg-white/4 border border-white/8 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/40 focus:outline-none transition-all duration-150"
+          class="w-full bg-white/[0.04] border border-white/8 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/40 focus:outline-none transition-all duration-150"
         />
       </div>
       <div class="bg-white/5 p-1 rounded-xl flex gap-1 overflow-x-auto">
@@ -456,7 +468,7 @@ onMounted(() => fetchData())
     </div>
 
     <!-- Table -->
-    <div class="bg-white/3 border border-white/6 rounded-2xl overflow-hidden">
+    <div class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-left whitespace-nowrap">
           <thead class="bg-white/5 text-slate-400 text-[10px] font-semibold uppercase tracking-wider border-b border-white/5">
@@ -503,7 +515,7 @@ onMounted(() => fetchData())
               v-else
               v-for="r in filtered"
               :key="r.id"
-              class="hover:bg-white/3 transition-colors duration-150 group cursor-pointer"
+              class="hover:bg-white/[0.03] transition-colors duration-150 group cursor-pointer"
               @click="openDetail(r)"
             >
               <td class="p-5">
@@ -520,7 +532,7 @@ onMounted(() => fetchData())
                 </div>
               </td>
               <td class="p-5">
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border bg-white/3 border-white/6 text-slate-400">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border bg-white/[0.03] border-white/6 text-slate-400">
                   {{ structureLabel[r.payment_structure || 'one_time'] }}
                 </span>
               </td>
@@ -557,7 +569,7 @@ onMounted(() => fetchData())
       </div>
     </div>
 
-    <!-- ── Templates Panel (now a centered modal for consistency) ────────── -->
+    <!-- ── Templates Panel (centered modal) ────────── -->
     <Teleport to="body">
       <Transition name="modal">
         <div
@@ -804,8 +816,8 @@ onMounted(() => fetchData())
                   <label class="block text-xs font-semibold text-slate-400">Client <span class="text-red-400">*</span></label>
                   <div class="relative">
                     <select v-model="form.client_id" required class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
-                      <option value="" disabled>Choose...</option>
-                      <option v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
+                      <option class="bg-black text-white" value="" disabled>Choose...</option>
+                      <option class="bg-black text-white" v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
                     </select>
                     <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
                   </div>
@@ -814,8 +826,8 @@ onMounted(() => fetchData())
                   <label class="block text-xs font-semibold text-slate-400">Project</label>
                   <div class="relative">
                     <select v-model="form.project_id" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
-                      <option value="">None</option>
-                      <option v-for="p in clientProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
+                      <option class="bg-black text-white" value="">None</option>
+                      <option class="bg-black text-white" v-for="p in clientProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
                     </select>
                     <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
                   </div>
@@ -868,7 +880,7 @@ onMounted(() => fetchData())
                   <label class="block text-xs font-semibold text-slate-400">Currency</label>
                   <div class="relative">
                     <select v-model="form.currency" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
-                      <option value="NGN">NGN</option><option value="USD">USD</option><option value="GBP">GBP</option><option value="EUR">EUR</option>
+                      <option class="bg-black text-white" value="NGN">NGN</option><option class="bg-black text-white" value="USD">USD</option><option class="bg-black text-white" value="GBP">GBP</option><option class="bg-black text-white" value="EUR">EUR</option>
                     </select>
                     <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
                   </div>
@@ -880,7 +892,7 @@ onMounted(() => fetchData())
                 <label class="block text-xs font-semibold text-slate-400">Currency</label>
                 <div class="relative">
                   <select v-model="form.currency" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
-                    <option value="NGN">NGN</option><option value="USD">USD</option><option value="GBP">GBP</option><option value="EUR">EUR</option>
+                    <option class="bg-black text-white" value="NGN">NGN</option><option class="bg-black text-white" value="USD">USD</option><option class="bg-black text-white" value="GBP">GBP</option><option class="bg-black text-white" value="EUR">EUR</option>
                   </select>
                   <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
                 </div>
@@ -934,10 +946,10 @@ onMounted(() => fetchData())
                   <label class="block text-xs font-semibold text-slate-400">Interval</label>
                   <div class="relative">
                     <select v-model="recurringInterval" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="quarterly">Quarterly</option>
-                      <option value="yearly">Yearly</option>
+                      <option class="bg-black text-white" value="weekly">Weekly</option>
+                      <option class="bg-black text-white" value="monthly">Monthly</option>
+                      <option class="bg-black text-white" value="quarterly">Quarterly</option>
+                      <option class="bg-black text-white" value="yearly">Yearly</option>
                     </select>
                     <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
                   </div>

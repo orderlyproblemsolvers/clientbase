@@ -344,28 +344,29 @@ onMounted(() => fetchData())
 
 <template>
   <div class="min-h-screen bg-base font-sans">
-
-    <!-- Header -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8">
-      <div>
-        <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
-          <UIcon name="i-heroicons-book-open" class="w-8 h-8 text-primary" />
-          Library
-        </h1>
-        <p class="text-slate-400 mt-2 text-sm max-w-lg">
-          Prompts, templates, documentation, configs, and code — all in one place.
-        </p>
+    <!-- ===== Hero Header ===== -->
+    <div class="relative mb-8 rounded-2xl bg-gradient-to-r from-primary/5 to-transparent border border-white/6 p-5 md:p-6">
+      <div class="flex flex-col md:flex-row justify-between md:items-center gap-4">
+        <div>
+          <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
+            <UIcon name="i-heroicons-book-open" class="w-8 h-8 text-primary" />
+            Library
+          </h1>
+          <p class="text-slate-400 mt-2 text-sm max-w-lg">
+            Prompts, templates, documentation, configs, and code — all in one place.
+          </p>
+        </div>
+        <button
+          @click="resetForm(); showCreateModal = true"
+          class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98] shrink-0"
+        >
+          <UIcon name="i-heroicons-plus" class="w-4 h-4" />
+          Add Resource
+        </button>
       </div>
-      <button
-        @click="resetForm(); showCreateModal = true"
-        class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98] shrink-0"
-      >
-        <UIcon name="i-heroicons-plus" class="w-4 h-4" />
-        Add Resource
-      </button>
     </div>
 
-    <!-- Type filter chips (segment control) -->
+    <!-- Type filter chips -->
     <div class="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
       <button
         @click="selectedType = 'all'; selectedLang = 'all'"
@@ -432,12 +433,11 @@ onMounted(() => fetchData())
       </div>
     </div>
 
-    <!-- Loading -->
+    <!-- Loading / Empty / Grid -->
     <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <div v-for="i in 6" :key="i" class="bg-white/[0.03] border border-white/6 rounded-2xl h-56 animate-pulse"></div>
     </div>
 
-    <!-- Empty -->
     <div v-else-if="filteredResources.length === 0" class="flex flex-col items-center justify-center py-20 border border-dashed border-white/8 rounded-2xl">
       <div class="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
         <UIcon name="i-heroicons-book-open" class="w-6 h-6 text-slate-600" />
@@ -455,7 +455,6 @@ onMounted(() => fetchData())
       </button>
     </div>
 
-    <!-- Resource grid -->
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
       <div
         v-for="item in filteredResources"
@@ -560,12 +559,11 @@ onMounted(() => fetchData())
           <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="showViewModal = false" aria-hidden="true"></div>
 
           <div class="relative w-full sm:max-w-4xl bg-[#0d1525] border border-white/8 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh]">
-            <!-- Mobile drag indicator -->
             <div class="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
               <div class="w-10 h-1 rounded-full bg-white/10"></div>
             </div>
 
-            <!-- Header -->
+            <!-- Header (AI tool buttons removed) -->
             <div class="p-5 border-b border-white/5 flex items-start justify-between gap-4 shrink-0">
               <div class="flex items-center gap-3 min-w-0">
                 <div
@@ -581,21 +579,6 @@ onMounted(() => fetchData())
               </div>
 
               <div class="flex items-center gap-2 shrink-0">
-                <!-- AI tools -->
-                <template v-if="selectedItem.type === 'prompt'">
-                  <div class="flex gap-1">
-                    <button
-                      v-for="tool in AI_TOOLS"
-                      :key="tool.id"
-                      @click="openInAI(tool.id, selectedItem.code)"
-                      class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/8 text-slate-400 hover:text-white text-[10px] font-semibold uppercase tracking-wide transition-colors border border-white/6"
-                      :title="`Open in ${tool.name}`"
-                    >
-                      {{ tool.name }}
-                    </button>
-                  </div>
-                </template>
-
                 <button
                   v-if="selectedItem.type === 'template' && templateVariables.length"
                   @click="showViewModal = false; openFillModal(selectedItem)"
@@ -631,7 +614,6 @@ onMounted(() => fetchData())
             </div>
 
             <div class="flex-1 overflow-auto">
-
               <!-- Code / Config -->
               <div v-if="selectedItem.type === 'code' || selectedItem.type === 'config'" class="p-6">
                 <div v-html="highlightedCode" class="bg-white/[0.03] rounded-2xl border border-white/6 p-5"></div>
@@ -676,7 +658,6 @@ onMounted(() => fetchData())
               <div v-else-if="selectedItem.type === 'doc'" class="p-6">
                 <div class="prose prose-invert max-w-none prose-indigo leading-relaxed text-slate-300 bg-white/[0.03] rounded-2xl border border-white/6 p-5" v-html="renderedDoc"></div>
               </div>
-
             </div>
 
             <!-- Footer -->
@@ -727,8 +708,6 @@ onMounted(() => fetchData())
             </div>
 
             <div class="p-6 overflow-y-auto space-y-6">
-
-              <!-- Variable inputs -->
               <div>
                 <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-3">Variables</p>
                 <div class="space-y-3">
@@ -744,13 +723,11 @@ onMounted(() => fetchData())
                 </div>
               </div>
 
-              <!-- Preview -->
               <div>
                 <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-3">Preview</p>
                 <pre class="font-mono text-sm text-slate-300 whitespace-pre-wrap leading-relaxed bg-white/[0.03] rounded-2xl p-5 border border-white/6 max-h-60 overflow-y-auto">{{ filledContent }}</pre>
               </div>
 
-              <!-- Actions -->
               <div class="flex gap-3">
                 <button type="button" @click="showFillModal = false" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all">Cancel</button>
                 <button

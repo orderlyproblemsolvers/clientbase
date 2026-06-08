@@ -39,7 +39,6 @@ const displayName = computed(() => auth.displayName)
 const displayRole = computed(() => auth.displayRole)
 const displayInitial = computed(() => auth.displayInitial)
 
-// Profile-specific reads (used in the footer)
 const avatarUrl      = computed(() => auth.profile.avatar_url)
 const profileLoading = computed(() => auth.profileLoading)
 
@@ -94,9 +93,9 @@ function getNavItems(state: 'expanded' | 'collapsed'): NavigationMenuItem[] {
   <div class="h-screen w-screen bg-base text-white flex flex-col overflow-hidden">
 
     <!-- Mobile-only top bar -->
-    <header class="lg:hidden flex-none flex items-center justify-between p-4 bg-secondary border-b border-white/5 z-40">
+    <header class="lg:hidden flex-none flex items-center justify-between px-5 py-4 bg-base border-b border-white/5 z-40">
       <NuxtLink to="/">
-        <img src="/img/clientbaselogo-white.png" alt="Client Base OPS" class="h-16 w-auto object-contain" />
+        <img src="/img/clientbaselogo-white.png" alt="Client Base OPS" class="h-12 w-auto object-contain" />
       </NuxtLink>
       <button
         class="p-2 text-slate-400 hover:text-white transition-colors"
@@ -116,12 +115,14 @@ function getNavItems(state: 'expanded' | 'collapsed'): NavigationMenuItem[] {
         :close="isMobile"
         close-icon="i-heroicons-x-mark"
         collapsible="icon"
+        expand-on-hover
         :ui="{
-          root: 'bg-secondary border-r border-white/5 shadow-2xl lg:shadow-none',
+          root: 'bg-base border-r border-white/5 shadow-2xl lg:shadow-none',
+          panel: 'bg-base border-r border-white/5',   // ← overlay panel on mobile now uses dark base
           header: 'h-16 border-b border-white/5 px-4 flex items-center',
           body: 'px-2 py-2 mt-1',
           footer: 'border-t border-white/5 px-0 py-0',
-          inner: 'bg-secondary divide-white/5',
+          inner: 'bg-base divide-white/5',
           container: 'h-full',
         }"
       >
@@ -136,14 +137,14 @@ function getNavItems(state: 'expanded' | 'collapsed'): NavigationMenuItem[] {
                   key="full"
                   src="/img/clientbaselogo-white.png"
                   alt="Client Base OPS"
-                  class="h-16 w-auto object-contain"
+                  class="h-12 w-auto object-contain"
                 />
                 <img
                   v-else
                   key="mini"
                   src="/img/clientbaselogo-min.png"
                   alt="Client Base"
-                  class="h-16 w-auto object-contain drop-shadow-lg"
+                  class="h-12 w-auto object-contain drop-shadow-lg"
                 />
               </Transition>
             </NuxtLink>
@@ -167,73 +168,72 @@ function getNavItems(state: 'expanded' | 'collapsed'): NavigationMenuItem[] {
           :ui="{
             root: 'w-full',
             link: [
-              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium',
-              'text-gray-400 hover:text-white hover:bg-white/5 transition-all',
+              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium',
+              'text-slate-400 hover:text-white hover:bg-white/5 transition-all duration-150',
               'data-[active=true]:bg-white/5 data-[active=true]:text-primary',
               'overflow-hidden whitespace-nowrap',
             ],
             linkLeadingIcon: 'size-5 shrink-0',
-            label: 'pt-6 pb-2 px-3 text-[9px] uppercase font-bold text-gray-600 tracking-widest',
+            label: 'pt-6 pb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-slate-600',
           }"
         />
 
         <!-- User Profile + Logout -->
-<!-- Replace the footer section inside USidebar #footer -->
-<template #footer>
-  <div v-if="user">
+        <template #footer>
+          <div v-if="user">
 
-    <!-- Loading -->
-    <div
-      v-if="profileLoading"
-      class="p-4 flex items-center gap-2"
-      :class="!open ? 'justify-center' : ''"
-    >
-      <UIcon name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin text-primary shrink-0" />
-      <span v-if="open" class="text-xs text-gray-400">Loading profile...</span>
-    </div>
+            <!-- Loading -->
+            <div
+              v-if="profileLoading"
+              class="p-4 flex items-center gap-2"
+              :class="!open ? 'justify-center' : ''"
+            >
+              <UIcon name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin text-primary shrink-0" />
+              <span v-if="open" class="text-xs text-slate-400">Loading profile...</span>
+            </div>
 
-    <!-- Profile -->
-    <div
-      v-else
-      class="flex items-center gap-3 p-4"
-      :class="!open ? 'justify-center px-2' : ''"
-    >
-      <img
-        v-if="avatarUrl"
-        :src="avatarUrl"
-        alt="Profile"
-        class="w-8 h-8 rounded-full object-cover border-2 border-primary/50 shrink-0 shadow-lg"
-      />
-      <div
-        v-else
-        class="w-8 h-8 rounded-full bg-primary flex items-center justify-center font-bold text-xs text-white shrink-0 shadow-lg"
-      >
-        {{ displayInitial }}
-      </div>
+            <!-- Profile -->
+            <div
+              v-else
+              class="flex items-center gap-3 p-4"
+              :class="!open ? 'justify-center px-2' : ''"
+            >
+              <img
+                v-if="avatarUrl"
+                :src="avatarUrl"
+                alt="Profile"
+                class="w-8 h-8 rounded-full object-cover border-2 border-primary/50 shrink-0 shadow-lg"
+              />
+              <div
+                v-else
+                class="w-8 h-8 rounded-full bg-primary flex items-center justify-center font-bold text-xs text-white shrink-0 shadow-lg"
+              >
+                {{ displayInitial }}
+              </div>
 
-      <Transition name="fade">
-        <div v-if="open" class="truncate min-w-0">
-          <p class="text-xs font-bold text-white truncate">{{ displayName }}</p>
-          <p class="text-[9px] text-gray-500 font-medium truncate">{{ displayRole }}</p>
-        </div>
-      </Transition>
-    </div>
+              <Transition name="fade">
+                <div v-if="open" class="truncate min-w-0">
+                  <p class="text-xs font-bold text-white truncate">{{ displayName }}</p>
+                  <p class="text-[9px] text-slate-500 font-medium truncate">{{ displayRole }}</p>
+                </div>
+              </Transition>
+            </div>
 
-    <!-- Logout -->
-    <div class="border-t border-white/5">
-      <button
-        @click="auth.logout"
-        class="w-full px-4 py-3 text-[10px] uppercase font-bold text-red-400 hover:bg-red-500/10 transition-all flex items-center gap-2"
-        :class="!open ? 'justify-center' : ''"
-        :title="!open ? 'Logout' : ''"
-      >
-        <UIcon name="i-heroicons-arrow-left-on-rectangle" class="w-4 h-4 shrink-0" />
-        <span v-if="open">Logout</span>
-      </button>
-    </div>
+            <!-- Logout -->
+            <div class="border-t border-white/5">
+              <button
+                @click="auth.logout"
+                class="w-full px-4 py-3 text-[10px] font-bold uppercase text-red-400 hover:bg-red-500/10 transition-all flex items-center gap-2"
+                :class="!open ? 'justify-center' : ''"
+                :title="!open ? 'Logout' : ''"
+              >
+                <UIcon name="i-heroicons-arrow-left-on-rectangle" class="w-4 h-4 shrink-0" />
+                <span v-if="open">Logout</span>
+              </button>
+            </div>
 
-  </div>
-</template>
+          </div>
+        </template>
 
       </USidebar>
 
