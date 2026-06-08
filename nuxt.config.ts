@@ -39,7 +39,7 @@ export default defineNuxtConfig({
     redirectOptions: {
       login: '/login',
       callback: '/confirm', 
-      exclude: ['/welcome', '/login', '/signup'], // Pages anyone can see
+      exclude: ['/welcome', '/login', '/signup', '/view/**', '/brief/**'],
     },
   },
   runtimeConfig:{
