@@ -6,7 +6,7 @@ export default defineNuxtRouteMiddleware((to, from) => {
   const isClientBrief  = to.path.startsWith('/brief/')  
   const isProjectView  = to.path.startsWith('/view/')
 
-  if (isInvoicePrint || isClientBrief) return
+  if (isInvoicePrint || isClientBrief || isProjectView) return
 
   if (!user.value) {
     if (!publicRoutes.includes(to.path)) return navigateTo('/welcome')
