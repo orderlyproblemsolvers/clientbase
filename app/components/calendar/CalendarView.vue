@@ -22,16 +22,32 @@
         </button>
       </div>
 
-      <button
-        @click="goToToday"
-        class="h-10 px-4 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] text-slate-300 hover:text-white border border-white/[0.06] text-xs font-medium tracking-wide transition-all duration-150 active:scale-95"
-      >
-        Today
-      </button>
+      <div class="flex items-center gap-2">
+        <!-- Heatmap toggle -->
+        <button
+          @click="showHeatmap = !showHeatmap"
+          class="h-10 px-4 rounded-xl text-xs font-medium tracking-wide transition-all duration-150 active:scale-95 flex items-center gap-2"
+          :class="showHeatmap
+            ? 'bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20'
+            : 'bg-white/[0.03] text-slate-400 hover:text-white border border-white/[0.06] hover:bg-white/[0.07]'"
+          :aria-label="showHeatmap ? 'Hide heatmap' : 'Show heatmap'"
+        >
+          <UIcon name="i-heroicons-fire" class="w-4 h-4" />
+          <span class="hidden sm:inline">Heatmap</span>
+        </button>
+
+        <button
+          @click="goToToday"
+          class="h-10 px-4 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] text-slate-300 hover:text-white border border-white/[0.06] text-xs font-medium tracking-wide transition-all duration-150 active:scale-95"
+        >
+          Today
+        </button>
+      </div>
     </div>
 
     <!-- ===== Legend ===== -->
     <div class="flex items-center gap-x-4 gap-y-2 mb-6 flex-wrap pb-4 border-b border-white/[0.04] overflow-x-auto">
+      <!-- Item-type legend -->
       <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium whitespace-nowrap">
         <span class="w-2 h-2 rounded-full bg-blue-400"></span> Milestone
       </div>
@@ -55,6 +71,23 @@
       </div>
       <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium whitespace-nowrap">
         <span class="w-2 h-2 rounded-full bg-rose-500"></span> Invoice Overdue
+      </div>
+
+      <!-- Separator -->
+      <div class="w-px h-4 bg-white/10 hidden sm:block"></div>
+
+      <!-- Heatmap legend -->
+      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium whitespace-nowrap">
+        <span class="w-3 h-3 rounded bg-emerald-500/20 border border-emerald-500/30"></span>
+        Light (0‑2)
+      </div>
+      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium whitespace-nowrap">
+        <span class="w-3 h-3 rounded bg-amber-500/20 border border-amber-500/30"></span>
+        Medium (3‑5)
+      </div>
+      <div class="flex items-center gap-2 text-[11px] text-slate-500 font-medium whitespace-nowrap">
+        <span class="w-3 h-3 rounded bg-rose-500/20 border border-rose-500/30"></span>
+        Heavy (6+)
       </div>
     </div>
 
@@ -92,9 +125,16 @@
               @click="selectDay(day.date)"
               class="relative flex flex-col justify-between rounded-xl p-1.5 sm:p-2 cursor-pointer transition-all duration-150 group select-none border min-h-[70px] sm:min-h-[90px] lg:min-h-[105px]"
               :class="[
-                day.currentMonth ? 'bg-white/[0.02] hover:bg-white/[0.05]' : 'bg-transparent opacity-35 hover:opacity-60',
-                isSelected(day.date) ? '!bg-primary/[0.04] ring-1 ring-primary/40 border-primary/30' : 'border-white/[0.04]',
-                isToday(day.date) ? '!border-primary/50 bg-white/[0.04]' : '',
+                // Heatmap background (takes precedence if enabled)
+                showHeatmap ? workloadClass(day.date) : '',
+                // Current month vs out-of-month
+                day.currentMonth ? '' : 'opacity-50',
+                // Selected / today overrides
+                isSelected(day.date) ? '!bg-primary/[0.04] ring-1 ring-primary/40 border-primary/30' : '',
+                isToday(day.date) ? '!border-primary/50' : '',
+                // Border and hover
+                !isSelected(day.date) && !isToday(day.date) ? 'border-white/[0.04]' : '',
+                day.currentMonth && !isSelected(day.date) ? 'hover:bg-white/[0.05]' : 'hover:opacity-70'
               ]"
             >
               <!-- Date number -->
@@ -145,6 +185,7 @@
         </template>
       </div>
 
+      <!-- Selected Day Panel (unchanged) -->
       <!-- Selected Day Panel (inline sidebar / below on mobile) -->
       <Transition name="panel">
         <div
@@ -256,15 +297,10 @@
 </template>
 
 <script setup>
-// ── ENTIRE SCRIPT LOGIC REMAINS EXACTLY THE SAME ── //
-// (copied from original for completeness)
 import { ref, computed, onMounted } from 'vue'
 
 const props = defineProps({
-  projectId: {
-    type: String,
-    default: null
-  }
+  projectId: { type: String, default: null }
 })
 
 const supabase = useSupabaseClient()
@@ -272,12 +308,14 @@ const supabase = useSupabaseClient()
 const loading = ref(true)
 const currentDate = ref(new Date())
 const selectedDay = ref(null)
+const showHeatmap = ref(true)   // <-- toggle state
 
 const milestones = ref([])
 const tasks = ref([])
 const projects = ref([])
 const invoices = ref([])
 
+// ── Data fetching (unchanged) ─────────────────────────────────────────────────
 const fetchData = async () => {
   loading.value = true
   try {
@@ -321,61 +359,36 @@ const fetchData = async () => {
   }
 }
 
+// ── All items composition (unchanged) ─────────────────────────────────────────
 const allItems = computed(() => {
+  // ... identical to original ...
   const items = []
   milestones.value.forEach(m => {
     items.push({
-      id: `milestone-${m.id}`,
-      date: m.due_date,
-      type: 'milestone',
-      title: m.title,
-      status: m.status,
-      projectId: m.projects?.id,
-      projectName: m.projects?.name,
-      clientId: m.projects?.clients?.id,
-      clientName: m.projects?.clients?.name,
+      id: `milestone-${m.id}`, date: m.due_date, type: 'milestone', title: m.title, status: m.status,
+      projectId: m.projects?.id, projectName: m.projects?.name,
+      clientId: m.projects?.clients?.id, clientName: m.projects?.clients?.name
     })
   })
   tasks.value.forEach(t => {
     items.push({
-      id: `task-${t.id}`,
-      date: t.due_date,
-      type: 'task',
-      title: t.title,
-      status: t.status,
-      priority: t.priority,
-      projectId: t.milestones?.projects?.id,
-      projectName: t.milestones?.projects?.name,
-      clientId: t.milestones?.projects?.clients?.id,
-      clientName: t.milestones?.projects?.clients?.name,
-      milestoneTitle: t.milestones?.title,
+      id: `task-${t.id}`, date: t.due_date, type: 'task', title: t.title, status: t.status, priority: t.priority,
+      projectId: t.milestones?.projects?.id, projectName: t.milestones?.projects?.name,
+      clientId: t.milestones?.projects?.clients?.id, clientName: t.milestones?.projects?.clients?.name,
+      milestoneTitle: t.milestones?.title
     })
   })
   projects.value.forEach(p => {
     if (p.start_date) {
       items.push({
-        id: `project-start-${p.id}`,
-        date: p.start_date,
-        type: 'project_start',
-        title: p.name,
-        status: 'active',
-        projectId: p.id,
-        projectName: p.name,
-        clientId: p.clients?.id,
-        clientName: p.clients?.name,
+        id: `project-start-${p.id}`, date: p.start_date, type: 'project_start', title: p.name, status: 'active',
+        projectId: p.id, projectName: p.name, clientId: p.clients?.id, clientName: p.clients?.name
       })
     }
     if (p.end_date) {
       items.push({
-        id: `project-end-${p.id}`,
-        date: p.end_date,
-        type: 'project_end',
-        title: p.name,
-        status: 'active',
-        projectId: p.id,
-        projectName: p.name,
-        clientId: p.clients?.id,
-        clientName: p.clients?.name,
+        id: `project-end-${p.id}`, date: p.end_date, type: 'project_end', title: p.name, status: 'active',
+        projectId: p.id, projectName: p.name, clientId: p.clients?.id, clientName: p.clients?.name
       })
     }
   })
@@ -384,16 +397,9 @@ const allItems = computed(() => {
       ? inv.invoice_items.reduce((s, i) => s + Number(i.quantity) * Number(i.unit_rate), 0)
       : Number(inv.amount)
     items.push({
-      id: `invoice-${inv.id}`,
-      date: inv.due_date,
-      type: 'invoice_due',
-      title: inv.clients?.name || inv.title,
-      status: inv.status,
-      clientId: inv.clients?.id,
-      clientName: inv.clients?.name,
-      invoiceNumber: inv.invoice_number,
-      amount: total,
-      currency: inv.currency,
+      id: `invoice-${inv.id}`, date: inv.due_date, type: 'invoice_due', title: inv.clients?.name || inv.title,
+      status: inv.status, clientId: inv.clients?.id, clientName: inv.clients?.name,
+      invoiceNumber: inv.invoice_number, amount: total, currency: inv.currency
     })
   })
   return items
@@ -442,27 +448,10 @@ const monthLabel = computed(() =>
   currentDate.value.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
 )
 
-const prevMonth = () => {
-  const d = new Date(currentDate.value)
-  d.setMonth(d.getMonth() - 1)
-  currentDate.value = d
-}
-
-const nextMonth = () => {
-  const d = new Date(currentDate.value)
-  d.setMonth(d.getMonth() + 1)
-  currentDate.value = d
-}
-
-const goToToday = () => {
-  currentDate.value = new Date()
-  selectedDay.value = toKey(new Date())
-}
-
-const selectDay = (date) => {
-  const key = toKey(date)
-  selectedDay.value = selectedDay.value === key ? null : key
-}
+const prevMonth = () => { const d = new Date(currentDate.value); d.setMonth(d.getMonth() - 1); currentDate.value = d }
+const nextMonth = () => { const d = new Date(currentDate.value); d.setMonth(d.getMonth() + 1); currentDate.value = d }
+const goToToday = () => { currentDate.value = new Date(); selectedDay.value = toKey(new Date()) }
+const selectDay = (date) => { const key = toKey(date); selectedDay.value = selectedDay.value === key ? null : key }
 
 const selectedDayItems = computed(() =>
   selectedDay.value ? (itemsByDate.value[selectedDay.value] ?? []) : []
@@ -474,7 +463,18 @@ const selectedDayLabel = computed(() => {
     .toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 })
 
-const dotClass = (item) => {
+// ── Workload heatmap function ─────────────────────────────────────────────────
+const workloadClass = (date) => {
+  const key = toKey(date)
+  const count = (itemsByDate.value[key] || []).length
+  if (count === 0) return ''
+  if (count <= 2) return '!bg-emerald-500/10 !border-emerald-500/20'
+  if (count <= 5) return '!bg-amber-500/10 !border-amber-500/20'
+  return '!bg-rose-500/10 !border-rose-500/20'
+}
+
+// ── Chip / dot / panel helpers (unchanged) ───────────────────────────────────
+const dotClass = (item) => { /* ... same as before ... */
   if (item.type === 'milestone') return 'bg-blue-400'
   if (item.type === 'project_start') return 'bg-emerald-400'
   if (item.type === 'project_end') return 'bg-violet-400'
@@ -550,7 +550,6 @@ onMounted(() => fetchData())
 </script>
 
 <style scoped>
-/* Panel transition (fade + subtle scale) */
 .panel-enter-active,
 .panel-leave-active {
   transition: opacity 0.2s ease, transform 0.2s ease;
@@ -561,7 +560,6 @@ onMounted(() => fetchData())
   transform: scale(0.98);
 }
 
-/* Custom scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }

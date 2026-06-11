@@ -42,6 +42,9 @@ const displayInitial = computed(() => auth.displayInitial)
 const avatarUrl      = computed(() => auth.profile.avatar_url)
 const profileLoading = computed(() => auth.profileLoading)
 
+// ── Global search control ─────────────────────────────────────────────────────
+const { isOpen: showGlobalSearch } = useGlobalSearch()
+
 function getNavItems(state: 'expanded' | 'collapsed'): NavigationMenuItem[] {
   return [
     {
@@ -97,13 +100,24 @@ function getNavItems(state: 'expanded' | 'collapsed'): NavigationMenuItem[] {
       <NuxtLink to="/">
         <img src="/img/clientbaselogo-white.png" alt="Client Base OPS" class="h-12 w-auto object-contain" />
       </NuxtLink>
-      <button
-        class="p-2 text-slate-400 hover:text-white transition-colors"
-        aria-label="Open menu"
-        @click="open = true"
-      >
-        <UIcon name="i-heroicons-bars-3-bottom-left" class="w-6 h-6" />
-      </button>
+      <div class="flex items-center gap-2">
+        <!-- Global search button (mobile) -->
+        <button
+          class="p-2 text-slate-400 hover:text-white transition-colors"
+          aria-label="Search"
+          @click="showGlobalSearch = true"
+        >
+          <UIcon name="i-heroicons-magnifying-glass" class="w-5 h-5" />
+        </button>
+
+        <button
+          class="p-2 text-slate-400 hover:text-white transition-colors"
+          aria-label="Open menu"
+          @click="open = true"
+        >
+          <UIcon name="i-heroicons-bars-3-bottom-left" class="w-6 h-6" />
+        </button>
+      </div>
     </header>
 
     <!-- Sidebar + Main -->
@@ -118,7 +132,7 @@ function getNavItems(state: 'expanded' | 'collapsed'): NavigationMenuItem[] {
         expand-on-hover
         :ui="{
           root: 'bg-base border-r border-white/5 shadow-2xl lg:shadow-none',
-          panel: 'bg-base border-r border-white/5',   // ← overlay panel on mobile now uses dark base
+          panel: 'bg-base border-r border-white/5',
           header: 'h-16 border-b border-white/5 px-4 flex items-center',
           body: 'px-2 py-2 mt-1',
           footer: 'border-t border-white/5 px-0 py-0',
@@ -245,6 +259,9 @@ function getNavItems(state: 'expanded' | 'collapsed'): NavigationMenuItem[] {
       </main>
 
     </div>
+
+    <!-- Global Search (Cmd+K) -->
+    <GlobalSearch />
   </div>
 </template>
 

@@ -13,18 +13,8 @@ const isSavingNotes = ref(false)
 const notesDirty    = ref(false)
 const notesValue    = ref('')
 
-// Add project modal
-const showAddProject  = ref(false)
-const creatingProject = ref(false)
-const newProject = ref({
-  name:        '',
-  description: '',
-  status:      'active',
-  start_date:  '',
-  end_date:    '',
-  budget:      '',
-  currency:    'NGN',
-})
+// Quick Engagement modal
+const showEngagementModal = ref(false)
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 const fetchData = async () => {
@@ -54,38 +44,11 @@ const fetchData = async () => {
   }
 }
 
-// ── Create project ────────────────────────────────────────────────────────────
-const createProject = async () => {
-  if (!newProject.value.name.trim()) return
-  creatingProject.value = true
-  try {
-    let userId = user.value?.id
-    if (!userId) {
-      const { data } = await client.auth.getSession()
-      userId = data.session?.user?.id
-    }
-    if (!userId) throw new Error('Not authenticated — please refresh and try again')
-
-    const { error } = await client.from('projects').insert({
-      client_id:   clientId,
-      user_id:     userId,
-      name:        newProject.value.name.trim(),
-      description: newProject.value.description || null,
-      status:      newProject.value.status,
-      start_date:  newProject.value.start_date || null,
-      end_date:    newProject.value.end_date   || null,
-      budget:      newProject.value.budget ? parseFloat(newProject.value.budget) : null,
-      currency:    newProject.value.currency,
-    })
-    if (error) throw error
-
-    showAddProject.value = false
-    newProject.value = { name: '', description: '', status: 'active', start_date: '', end_date: '', budget: '', currency: 'NGN' }
-    await fetchData()
-  } catch (e: any) {
-    alert('Error creating project: ' + e.message)
-  } finally {
-    creatingProject.value = false
+// ── Quick Engagement callback ─────────────────────────────────────────────────
+const handleEngagementCreated = async (result: { projectId?: string; formId?: string }) => {
+  await fetchData()
+  if (result.projectId) {
+    navigateTo(`/projects/${result.projectId}`)
   }
 }
 
@@ -138,9 +101,17 @@ const getInitials = (name: string) =>
   name?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() || '?'
 
 const activeProjects = computed(() => projects.value.filter(p => p.status === 'active').length)
-const totalBudget = computed(() =>
-  projects.value.reduce((sum, p) => sum + (p.budget || 0), 0)
-)
+
+// Budget grouped by currency
+const budgetByCurrency = computed(() => {
+  const map: Record<string, number> = {}
+  projects.value.forEach(p => {
+    if (p.budget && p.currency) {
+      map[p.currency] = (map[p.currency] || 0) + p.budget
+    }
+  })
+  return Object.entries(map).map(([currency, total]) => ({ currency, total }))
+})
 
 onMounted(() => fetchData())
 </script>
@@ -183,8 +154,16 @@ onMounted(() => fetchData())
         <div class="relative z-10 flex flex-col lg:flex-row lg:items-start justify-between gap-6">
           <!-- Left: Client identity -->
           <div class="flex items-start gap-5">
-            <div class="w-16 h-16 rounded-2xl bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
-              <span class="text-primary font-bold text-xl tracking-tight">{{ getInitials(clientData.name) }}</span>
+            <div class="w-16 h-16 rounded-2xl bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0 overflow-hidden">
+              <img
+                v-if="clientData.logo_url"
+                :src="clientData.logo_url"
+                :alt="clientData.name"
+                class="w-full h-full object-cover"
+              />
+              <span v-else class="text-primary font-bold text-xl tracking-tight">
+                {{ getInitials(clientData.name) }}
+              </span>
             </div>
 
             <div class="space-y-3">
@@ -227,19 +206,18 @@ onMounted(() => fetchData())
               <span class="hidden sm:inline">Onboarding</span>
             </NuxtLink>
             <button
-              @click="showAddProject = true"
+              @click="showEngagementModal = true"
               class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98] shrink-0"
-              aria-label="New project"
+              aria-label="Quick project"
             >
               <UIcon name="i-heroicons-plus" class="w-4 h-4" />
-              <span class="hidden sm:inline">New Project</span>
+              <span class="hidden sm:inline">Quick Project</span>
             </button>
           </div>
         </div>
 
         <!-- Contact & Stats inline strip -->
         <div class="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/5">
-          <!-- Contact name -->
           <div v-if="clientData.contact_name" class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-xl bg-slate-700/50 flex items-center justify-center shrink-0">
               <UIcon name="i-heroicons-user" class="w-4 h-4 text-slate-400" />
@@ -249,8 +227,6 @@ onMounted(() => fetchData())
               <p class="text-sm font-medium text-white truncate">{{ clientData.contact_name }}</p>
             </div>
           </div>
-
-          <!-- Email -->
           <div v-if="clientData.contact_email" class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-xl bg-slate-700/50 flex items-center justify-center shrink-0">
               <UIcon name="i-heroicons-envelope" class="w-4 h-4 text-slate-400" />
@@ -265,8 +241,6 @@ onMounted(() => fetchData())
               </a>
             </div>
           </div>
-
-          <!-- Phone -->
           <div v-if="clientData.contact_phone" class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-xl bg-slate-700/50 flex items-center justify-center shrink-0">
               <UIcon name="i-heroicons-phone" class="w-4 h-4 text-slate-400" />
@@ -281,8 +255,6 @@ onMounted(() => fetchData())
               </a>
             </div>
           </div>
-
-          <!-- Active projects stat -->
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <UIcon name="i-heroicons-folder-open" class="w-4 h-4 text-primary" />
@@ -304,18 +276,20 @@ onMounted(() => fetchData())
             <h2 class="text-lg font-semibold text-white">Projects</h2>
             <p class="text-xs text-slate-500 mt-0.5">
               {{ projects.length }} project{{ projects.length !== 1 ? 's' : '' }}
-              <template v-if="totalBudget > 0">
-                · {{ formatBudget(totalBudget, projects[0]?.currency || 'NGN') }} total budget
+              <template v-if="budgetByCurrency.length > 0">
+                ·
+                <template v-for="(group, idx) in budgetByCurrency" :key="group.currency">
+                  {{ idx > 0 ? ' + ' : '' }}
+                  <span class="text-white font-medium">{{ formatBudget(group.total, group.currency) }}</span>
+                </template>
+                <span class="text-slate-500"> total budget</span>
               </template>
             </p>
           </div>
         </div>
 
         <!-- Empty state -->
-        <div
-          v-if="projects.length === 0"
-          class="border-2 border-dashed border-white/8 rounded-2xl p-16 text-center"
-        >
+        <div v-if="projects.length === 0" class="border-2 border-dashed border-white/8 rounded-2xl p-16 text-center">
           <div class="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
             <UIcon name="i-heroicons-folder-plus" class="w-7 h-7 text-slate-600" />
           </div>
@@ -324,7 +298,7 @@ onMounted(() => fetchData())
             Start tracking work for {{ clientData.name }} by creating the first project.
           </p>
           <button
-            @click="showAddProject = true"
+            @click="showEngagementModal = true"
             class="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
           >
             <UIcon name="i-heroicons-plus-circle" class="w-4 h-4" />
@@ -443,190 +417,12 @@ onMounted(() => fetchData())
       </section>
     </div>
 
-    <!-- Add Project Modal (identical structure, styling kept) -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div
-          v-if="showAddProject"
-          class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="modal-title"
-        >
-          <div
-            class="absolute inset-0 bg-black/70 backdrop-blur-sm"
-            @click="showAddProject = false"
-            aria-hidden="true"
-          ></div>
-
-          <div class="relative w-full sm:max-w-lg bg-[#0d1525] border border-white/8 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh]">
-            <div class="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
-              <div class="w-10 h-1 rounded-full bg-white/10"></div>
-            </div>
-
-            <div class="flex items-center justify-between px-6 py-5 border-b border-white/5 shrink-0">
-              <div>
-                <h2 id="modal-title" class="text-base font-bold text-white">New Project</h2>
-                <p class="text-xs text-slate-500 mt-0.5">For {{ clientData?.name }}</p>
-              </div>
-              <button
-                @click="showAddProject = false"
-                class="w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/8 transition-all duration-150"
-                aria-label="Close modal"
-              >
-                <UIcon name="i-heroicons-x-mark" class="w-5 h-5" />
-              </button>
-            </div>
-
-            <div class="overflow-y-auto flex-1 px-6 py-5">
-              <form @submit.prevent="createProject" class="space-y-5" id="new-project-form">
-                <div class="space-y-1.5">
-                  <label for="proj-name" class="block text-xs font-semibold text-slate-400">
-                    Project Name <span class="text-red-400" aria-hidden="true">*</span>
-                  </label>
-                  <input
-                    id="proj-name"
-                    v-model="newProject.name"
-                    type="text"
-                    autofocus
-                    required
-                    placeholder="e.g. Website Redesign"
-                    class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150"
-                  />
-                </div>
-
-                <div class="space-y-1.5">
-                  <label for="proj-desc" class="block text-xs font-semibold text-slate-400">Description</label>
-                  <textarea
-                    id="proj-desc"
-                    v-model="newProject.description"
-                    rows="3"
-                    placeholder="Brief description of the project scope…"
-                    class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150 resize-none leading-relaxed"
-                  ></textarea>
-                </div>
-
-                <div class="space-y-1.5">
-                  <label for="proj-status" class="block text-xs font-semibold text-slate-400">Status</label>
-                  <div class="relative">
-                    <select
-                      id="proj-status"
-                      v-model="newProject.status"
-                      class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150"
-                    >
-                      <option class="bg-black text-white" value="lead">Lead</option>
-                      <option class="bg-black text-white" value="proposal">Proposal</option>
-                      <option class="bg-black text-white" value="active">Active</option>
-                      <option class="bg-black text-white" value="review">In Review</option>
-                      <option class="bg-black text-white" value="complete">Complete</option>
-                      <option class="bg-black text-white" value="archived">Archived</option>
-                    </select>
-                    <UIcon
-                      name="i-heroicons-chevron-up-down"
-                      class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none"
-                      aria-hidden="true"
-                    />
-                  </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-3">
-                  <div class="space-y-1.5">
-                    <label for="proj-start" class="block text-xs font-semibold text-slate-400">Start Date</label>
-                    <input
-                      id="proj-start"
-                      v-model="newProject.start_date"
-                      type="date"
-                      class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150"
-                    />
-                  </div>
-                  <div class="space-y-1.5">
-                    <label for="proj-end" class="block text-xs font-semibold text-slate-400">End Date</label>
-                    <input
-                      id="proj-end"
-                      v-model="newProject.end_date"
-                      type="date"
-                      class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150"
-                    />
-                  </div>
-                </div>
-
-                <div class="space-y-1.5">
-                  <label for="proj-budget" class="block text-xs font-semibold text-slate-400">Budget</label>
-                  <div class="flex gap-2">
-                    <div class="relative flex-1">
-                      <select
-                        v-model="newProject.currency"
-                        aria-label="Currency"
-                        class="absolute left-3 top-1/2 -translate-y-1/2 bg-transparent text-xs font-semibold text-slate-400 focus:outline-none appearance-none cursor-pointer w-12 z-10"
-                      >
-                        <option class="bg-black text-white" value="NGN">NGN</option>
-                        <option class="bg-black text-white" value="USD">USD</option>
-                        <option class="bg-black text-white" value="GBP">GBP</option>
-                        <option class="bg-black text-white" value="EUR">EUR</option>
-                      </select>
-                      <input
-                        id="proj-budget"
-                        v-model="newProject.budget"
-                        type="number"
-                        placeholder="0"
-                        min="0"
-                        step="1"
-                        class="w-full bg-white/[0.04] border border-white/8 rounded-xl pl-14 pr-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </form>
-            </div>
-
-            <div class="px-6 py-4 border-t border-white/5 shrink-0 flex gap-2.5">
-              <button
-                type="button"
-                @click="showAddProject = false"
-                class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all duration-150"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                form="new-project-form"
-                :disabled="creatingProject || !newProject.name.trim()"
-                class="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98]"
-              >
-                <UIcon v-if="creatingProject" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
-                <template v-else>
-                  <UIcon name="i-heroicons-folder-plus" class="w-4 h-4" />
-                  Create Project
-                </template>
-              </button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-
+    <!-- ===== Quick Engagement Modal ===== -->
+    <QuickEngagementModal
+      v-if="showEngagementModal"
+      :client-id="clientId"
+      @close="showEngagementModal = false"
+      @created="handleEngagementCreated"
+    />
   </div>
 </template>
-
-<style scoped>
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 200ms ease;
-}
-.modal-enter-active .relative,
-.modal-leave-active .relative {
-  transition: transform 200ms cubic-bezier(0.32, 0.72, 0, 1);
-}
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-.modal-enter-from .relative {
-  transform: translateY(24px) scale(0.98);
-}
-@media (max-width: 639px) {
-  .modal-enter-from .relative {
-    transform: translateY(100%);
-  }
-}
-</style>

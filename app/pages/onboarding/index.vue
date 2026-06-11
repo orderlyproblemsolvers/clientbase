@@ -39,10 +39,10 @@ const fetchData = async () => {
 
     const { data: pData } = await supabase.from('projects').select('id, name, client_id').order('name')
     projects.value = pData || []
-  } catch (e) { 
-    console.error(e) 
-  } finally { 
-    loading.value = false 
+  } catch (e) {
+    console.error(e)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -69,8 +69,8 @@ watch(selectedTemplate, (v) => { if (v) copyFromFormId.value = '' })
 watch(copyFromFormId,   (v) => { if (v) selectedTemplate.value = '' })
 
 const createForm = async () => {
-  if (!newForm.value.title.trim())   return showToast('Form mapping requires descriptive title', 'error')
-  if (!newForm.value.client_id)      return showToast('Target structural client definition required', 'error')
+  if (!newForm.value.title.trim())   return showToast('Form requires a title', 'error')
+  if (!newForm.value.client_id)      return showToast('Select a client', 'error')
 
   creating.value = true
   try {
@@ -79,7 +79,7 @@ const createForm = async () => {
       const { data } = await supabase.auth.getSession()
       userId = data.session?.user?.id
     }
-    if (!userId) throw new Error('Authentication parameters missing')
+    if (!userId) throw new Error('Authentication missing')
 
     const { templateFields, copyFields } = useOnboarding()
     let fields = []
@@ -121,11 +121,11 @@ const createForm = async () => {
 }
 
 const deleteForm = async (id) => {
-  if (!confirm('Confirm definitive removal of this initialization vector?')) return
+  if (!confirm('Delete this form?')) return
   try {
     await supabase.from('onboarding_forms').delete().eq('id', id)
     forms.value = forms.value.filter(f => f.id !== id)
-    showToast('Onboarding profile purged successfully')
+    showToast('Form deleted')
   } catch (e) {
     showToast(e.message, 'error')
   }
@@ -140,12 +140,11 @@ const statusConfig = {
 const copyLink = (token) => {
   const url = `${window.location.origin}/brief/${token}`
   navigator.clipboard.writeText(url)
-  showToast('Access pipeline URL mapped to clipboard')
+  showToast('Client link copied')
 }
 
 onMounted(async () => {
   await fetchData()
-  
   if (route.query.new === '1' && route.query.client) {
     newForm.value.client_id = route.query.client
     showNewModal.value = true
@@ -155,7 +154,7 @@ onMounted(async () => {
 
 <template>
   <div class="min-h-screen bg-base font-sans">
-    <!-- ===== Hero Header ===== -->
+    <!-- Hero Header (same as before) -->
     <div class="relative mb-8 rounded-2xl bg-gradient-to-r from-primary/5 to-transparent border border-white/6 p-5 md:p-6">
       <div class="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div>
@@ -204,12 +203,11 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Loading -->
+    <!-- Loading / Empty / Grid (same as before) -->
     <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
       <div v-for="i in 3" :key="i" class="h-48 bg-white/[0.03] border border-white/6 rounded-2xl animate-pulse"></div>
     </div>
 
-    <!-- Empty state -->
     <div v-else-if="forms.length === 0" class="text-center py-20 border border-dashed border-white/8 rounded-2xl">
       <div class="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
         <UIcon name="i-heroicons-clipboard-document-list" class="w-6 h-6 text-slate-600" />
@@ -227,19 +225,14 @@ onMounted(async () => {
       </button>
     </div>
 
-    <!-- Forms grid -->
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-      <!-- Filtered empty -->
       <div v-if="filteredForms.length === 0" class="col-span-full text-center py-16 border border-dashed border-white/8 rounded-2xl">
         <div class="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
           <UIcon name="i-heroicons-funnel" class="w-6 h-6 text-slate-600" />
         </div>
         <p class="text-sm font-medium text-slate-300 mb-1">No forms match this filter</p>
         <p class="text-xs text-slate-500 mb-5">Try selecting a different status.</p>
-        <button
-          @click="filterStatus = 'all'"
-          class="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
-        >
+        <button @click="filterStatus = 'all'" class="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary/80 transition-colors">
           <UIcon name="i-heroicons-arrow-path" class="w-4 h-4" />
           Show all forms
         </button>
@@ -252,27 +245,15 @@ onMounted(async () => {
       >
         <div>
           <div class="flex items-center justify-between mb-4">
-            <span
-              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border"
-              :class="statusConfig[f.status]?.badge"
-            >
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border" :class="statusConfig[f.status]?.badge">
               <span class="w-1.5 h-1.5 rounded-full" :class="statusConfig[f.status]?.dot"></span>
               {{ statusConfig[f.status]?.label }}
             </span>
             <div class="flex items-center gap-0.5">
-              <button
-                v-if="f.status !== 'draft'"
-                @click="copyLink(f.token)"
-                class="p-1.5 rounded-xl text-slate-400 hover:text-primary hover:bg-white/8 transition-colors duration-150"
-                title="Copy client link"
-              >
+              <button v-if="f.status !== 'draft'" @click="copyLink(f.token)" class="p-1.5 rounded-xl text-slate-400 hover:text-primary hover:bg-white/8 transition-colors" title="Copy link">
                 <UIcon name="i-heroicons-link" class="w-4 h-4" />
               </button>
-              <button
-                @click="deleteForm(f.id)"
-                class="p-1.5 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors duration-150"
-                title="Delete form"
-              >
+              <button @click="deleteForm(f.id)" class="p-1.5 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Delete">
                 <UIcon name="i-heroicons-trash" class="w-4 h-4" />
               </button>
             </div>
@@ -329,12 +310,10 @@ onMounted(async () => {
           <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="showNewModal = false" aria-hidden="true"></div>
 
           <div class="relative w-full sm:max-w-md bg-[#0d1525] border border-white/8 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh]">
-            <!-- Mobile drag indicator -->
             <div class="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
               <div class="w-10 h-1 rounded-full bg-white/10"></div>
             </div>
 
-            <!-- Header -->
             <div class="flex items-center justify-between px-6 py-5 border-b border-white/5 shrink-0">
               <div>
                 <h2 id="new-form-title" class="text-base font-bold text-white">New Onboarding Form</h2>
@@ -349,7 +328,6 @@ onMounted(async () => {
               </button>
             </div>
 
-            <!-- Body -->
             <div class="overflow-y-auto flex-1 px-6 py-5 space-y-5">
               <!-- Client -->
               <div class="space-y-1.5">
@@ -372,7 +350,7 @@ onMounted(async () => {
                 </p>
               </div>
 
-              <!-- Form title -->
+              <!-- Title -->
               <div class="space-y-1.5">
                 <label class="block text-xs font-semibold text-slate-400">
                   Form title <span class="text-red-400">*</span>
