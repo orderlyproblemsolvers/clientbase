@@ -1,4 +1,4 @@
 export const useGlobalSearch = () => {
-  const isOpen = ref(false)
+  const isOpen = useState('global-search-open', () => false)
   return { isOpen }
 }

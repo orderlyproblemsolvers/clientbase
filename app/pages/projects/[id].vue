@@ -1,6 +1,4 @@
 <script setup lang="ts">
-
-// ⚠️ All script logic remains exactly the same — no functional changes.
 const { $md } = useNuxtApp()
 const route   = useRoute()
 const supabase = useSupabaseClient()
@@ -44,13 +42,35 @@ const isPreviewMode  = ref(false)
 const briefSubmission = ref(null)
 const briefForm       = ref(null)
 
+// Reminder config
+const reminderConfig = ref({
+  enabled: false,
+  frequency: 'weekly',
+  custom_message: '',
+  recipient_email: '',   // NEW: recipient override
+})
+const savingReminder = ref(false)
+const reminderLogs = ref<any[]>([])
+const loadingLogs = ref(false)
+const testEmailSending = ref(false)   // NEW
+const testEmailResult = ref('')       // NEW
+
+// Toast
+const toast = ref({ show: false, message: '', type: 'success' })
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+  toast.value = { show: true, message: msg, type }
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { toast.value.show = false }, 3000)
+}
+
 // ── Share link ────────────────────────────────────────────────────────────────
 const shareToken = ref<string | null>(null)
 const generatingShareLink = ref(false)
 const copiedShareLink = ref(false)
 
 const generateShareLink = async () => {
-  if (shareToken.value) return // already generated
+  if (shareToken.value) return
   generatingShareLink.value = true
   try {
     let token: string | null = projectData.value?.share_token
@@ -96,7 +116,6 @@ const revokeShareLink = async () => {
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 const fetchData = async () => {
-  // Guard early if no valid projectId exists
   if (!projectId.value) {
     loading.value = false
     return
@@ -104,7 +123,6 @@ const fetchData = async () => {
 
   loading.value = true
   try {
-    // Project + client join
     const { data: pData } = await supabase
       .from('projects')
       .select('*, clients(id, name, category, website)')
@@ -115,10 +133,8 @@ const fetchData = async () => {
     clientData.value  = pData?.clients
     notesDraft.value  = pData?.notes || ''
 
-    // Load existing share token
     shareToken.value = pData?.share_token || null
 
-    // Populate edit form
     editForm.value = {
       name:        pData?.name        || '',
       description: pData?.description || '',
@@ -129,21 +145,18 @@ const fetchData = async () => {
       currency:    pData?.currency    || 'NGN',
     }
 
-    // Secrets (via encrypted server route)
     const sData = await $fetch('/api/secrets', {
-  query: { project_id: projectId.value }
-})
+      query: { project_id: projectId.value }
+    })
     secrets.value = sData?.map((s) => ({ ...s, isRevealed: false })) || []
 
-    // Files
     const { data: fData } = await supabase
-      .from('files')  
+      .from('files')
       .select('*')
       .eq('project_id', projectId.value)
       .order('created_at', { ascending: false })
     files.value = fData || []
 
-    // Onboarding submission
     if (pData?.onboarding_submission_id) {
       const { data: subData } = await supabase
         .from('onboarding_submissions')
@@ -153,7 +166,6 @@ const fetchData = async () => {
       briefSubmission.value = subData
       briefForm.value       = subData?.onboarding_forms
     }
-
   } catch (e) {
     console.error(e)
   } finally {
@@ -206,7 +218,6 @@ const saveNotes = async () => {
   }
 }
 
-
 // ── Secrets ───────────────────────────────────────────────────────────────────
 const addSecret = async () => {
   if (!projectId.value) {
@@ -215,16 +226,15 @@ const addSecret = async () => {
   }
   if (!newSecret.value.name || !newSecret.value.value) return
 
-  
   try {
     await $fetch('/api/secrets', {
       method: 'POST',
-      body: { 
+      body: {
         user_id:  user.value.sub,
-        client_id: clientData.value?.id || null, 
-        project_id: projectId.value, 
-        key_name: newSecret.value.name, 
-        value: newSecret.value.value 
+        client_id: clientData.value?.id || null,
+        project_id: projectId.value,
+        key_name: newSecret.value.name,
+        value: newSecret.value.value
       }
     })
     showSecretModal.value = false
@@ -237,10 +247,10 @@ const addSecret = async () => {
 
 const deleteSecret = async (id) => {
   if (!confirm('Delete this secret?')) return
-  await $fetch('/api/secrets', { 
-  method: 'DELETE', 
-  query: { id } 
-})
+  await $fetch('/api/secrets', {
+    method: 'DELETE',
+    query: { id }
+  })
   await fetchData()
 }
 
@@ -315,8 +325,72 @@ const deleteProject = async () => {
   }
 }
 
+// ── Reminder config ───────────────────────────────────────────────────────────
+const fetchReminderConfig = async () => {
+  const { data } = await supabase
+    .from('invoice_reminder_configs')
+    .select('*')
+    .eq('project_id', projectId.value)
+    .single()
+  if (data) reminderConfig.value = data
+}
+
+const saveReminderConfig = async () => {
+  savingReminder.value = true
+  try {
+    const { error } = await supabase
+      .from('invoice_reminder_configs')
+      .upsert({
+        project_id: projectId.value,
+        enabled: reminderConfig.value.enabled,
+        frequency: reminderConfig.value.frequency,
+        custom_message: reminderConfig.value.custom_message,
+        recipient_email: reminderConfig.value.recipient_email || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'project_id' })   // <-- fix here
+    if (error) throw error
+    showToast('Reminder settings saved!')
+  } catch (e: any) {
+    showToast(e.message, 'error')
+  } finally { savingReminder.value = false }
+}
+
+const fetchReminderLogs = async () => {
+  loadingLogs.value = true
+  const { data } = await supabase
+    .from('invoice_reminder_logs')
+    .select('*')
+    .eq('project_id', projectId.value)
+    .order('sent_at', { ascending: false })
+    .limit(20)
+  reminderLogs.value = data || []
+  loadingLogs.value = false
+}
+
+// NEW: Send test email
+const sendTestEmail = async () => {
+  testEmailSending.value = true
+  testEmailResult.value = ''
+  try {
+    await $fetch('/api/send-test-reminder', {
+      method: 'POST',
+      body: {
+        project_id: projectId.value,
+        recipient_email: reminderConfig.value.recipient_email,  // <-- pass the override
+      },
+    })
+    testEmailResult.value = 'sent'
+    showToast('Test email sent! Check your inbox.')
+  } catch (e: any) {
+    testEmailResult.value = 'failed'
+    showToast(e.message || 'Failed to send test email', 'error')
+  } finally {
+    testEmailSending.value = false
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const statusConfig = {
+const statusConfig: Record<string, { label: string; dot: string; badge: string }> = {
   lead:     { label: 'Lead',     dot: 'bg-slate-400',   badge: 'text-slate-300  bg-slate-400/10  border-slate-400/20'  },
   proposal: { label: 'Proposal', dot: 'bg-blue-400',    badge: 'text-blue-300   bg-blue-400/10   border-blue-400/20'   },
   active:   { label: 'Active',   dot: 'bg-emerald-400', badge: 'text-emerald-300 bg-emerald-400/10 border-emerald-400/20' },
@@ -335,11 +409,19 @@ const tabs = [
   { key: 'milestones', label: 'Milestones', icon: 'i-heroicons-flag' },
   { key: 'calendar',   label: 'Calendar',   icon: 'i-heroicons-calendar-days' },
   { key: 'brief',      label: 'Brief',      icon: 'i-heroicons-clipboard-document-list' },
+  { key: 'reminders',  label: 'Reminders',  icon: 'i-heroicons-bell-alert' },
 ]
 
 const highlightedNotes = computed(() => {
   if (!notesDraft.value) return ''
   return $md.render(notesDraft.value)
+})
+
+watch(activeTab, (tab) => {
+  if (tab === 'reminders') {
+    fetchReminderConfig()
+    fetchReminderLogs()
+  }
 })
 
 onMounted(() => fetchData())
@@ -386,11 +468,9 @@ onMounted(() => fetchData())
 
       <!-- ===== Hero Header ===== -->
       <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/[0.04] via-white/[0.02] to-transparent border border-white/6 p-6 md:p-8">
-        <!-- Background accent -->
         <div class="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none"></div>
         
         <div class="relative z-10 flex flex-col lg:flex-row lg:items-start justify-between gap-6">
-          <!-- Left: Project identity -->
           <div class="flex items-start gap-5">
             <div class="w-16 h-16 rounded-2xl bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
               <span class="text-primary font-bold text-xl tracking-tight">
@@ -855,6 +935,101 @@ onMounted(() => fetchData())
             </div>
           </div>
         </div>
+
+        <!-- REMINDERS TAB -->
+        <div v-if="activeTab === 'reminders'" class="space-y-6">
+          <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-6">
+            <h3 class="text-base font-semibold text-white mb-4">Invoice Reminders</h3>
+            <div class="space-y-4">
+              <label class="flex items-center gap-3 cursor-pointer">
+                <input v-model="reminderConfig.enabled" type="checkbox"
+                       class="w-4 h-4 rounded border-white/10 bg-white/5 text-primary focus:ring-primary" />
+                <span class="text-sm text-slate-300">Send automatic reminders for overdue invoices</span>
+              </label>
+
+              <div v-if="reminderConfig.enabled" class="space-y-4 pl-7">
+                <!-- Recipient email override -->
+                <div class="space-y-1.5">
+                  <label class="text-xs font-semibold text-slate-400">Recipient Email (optional override)</label>
+                  <input v-model="reminderConfig.recipient_email" type="email"
+                         placeholder="Leave blank to use client's email"
+                         class="w-full sm:w-64 bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none" />
+                </div>
+
+                <!-- Frequency -->
+                <div class="space-y-1.5">
+                  <label class="text-xs font-semibold text-slate-400">Frequency</label>
+                  <div class="relative w-full sm:w-48">
+                    <select v-model="reminderConfig.frequency"
+                            class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer">
+                      <option value="daily" class="bg-[#0d1525]">Daily</option>
+                      <option value="weekly" class="bg-[#0d1525]">Weekly</option>
+                      <option value="biweekly" class="bg-[#0d1525]">Every 2 Weeks</option>
+                      <option value="monthly" class="bg-[#0d1525]">Monthly</option>
+                    </select>
+                    <UIcon name="i-heroicons-chevron-up-down"
+                           class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
+                  </div>
+                </div>
+
+                <!-- Custom message -->
+                <div class="space-y-1.5">
+                  <label class="text-xs font-semibold text-slate-400">Custom Message (optional)</label>
+                  <textarea v-model="reminderConfig.custom_message" rows="3"
+                            placeholder="Add a personal note to the reminder email..."
+                            class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none"></textarea>
+                </div>
+
+                <!-- Test email button -->
+                <div class="pt-2">
+                  <button @click="sendTestEmail" :disabled="testEmailSending"
+                          class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-white/5 hover:bg-white/8 border border-white/6 text-slate-400 hover:text-white transition-all">
+                    <UIcon v-if="testEmailSending" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
+                    <UIcon v-else name="i-heroicons-envelope" class="w-4 h-4" />
+                    {{ testEmailSending ? 'Sending...' : 'Send Test Email to Yourself' }}
+                  </button>
+                  <p v-if="testEmailResult" class="text-xs mt-2" :class="testEmailResult === 'sent' ? 'text-emerald-400' : 'text-red-400'">
+                    {{ testEmailResult === 'sent' ? 'Test email sent! Check your inbox.' : 'Failed to send test email.' }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="pt-4 border-t border-white/5">
+                <button @click="saveReminderConfig" :disabled="savingReminder"
+                        class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98] disabled:opacity-50">
+                  <UIcon v-if="savingReminder" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
+                  <span v-else>Save Settings</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Logs -->
+          <div class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
+            <div class="px-5 py-4 border-b border-white/5">
+              <h3 class="text-sm font-semibold text-white">Recent Reminder Logs</h3>
+            </div>
+            <div v-if="loadingLogs" class="p-5 text-center text-sm text-slate-500">Loading logs...</div>
+            <div v-else-if="reminderLogs.length === 0" class="p-5 text-center text-sm text-slate-500">
+              <UIcon name="i-heroicons-inbox" class="w-6 h-6 mx-auto mb-2 text-slate-600" />
+              No reminders sent yet.
+            </div>
+            <div v-else class="divide-y divide-white/5">
+              <div v-for="log in reminderLogs" :key="log.id"
+                   class="flex items-center justify-between px-5 py-3 text-sm">
+                <div class="min-w-0 flex-1">
+                  <p class="text-white font-medium truncate">{{ log.sent_to }}</p>
+                  <p class="text-xs text-slate-500">{{ new Date(log.sent_at).toLocaleString() }}</p>
+                  <p v-if="log.error_message" class="text-xs text-red-400 mt-0.5">{{ log.error_message }}</p>
+                </div>
+                <span :class="log.status === 'sent' ? 'text-emerald-400' : 'text-red-400'"
+                      class="text-xs font-semibold shrink-0 ml-4">
+                  {{ log.status === 'sent' ? 'Sent' : 'Failed' }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ===== Danger Zone ===== -->
@@ -1022,6 +1197,26 @@ onMounted(() => fetchData())
         </div>
       </Transition>
     </Teleport>
+
+    <!-- Toast -->
+    <Transition
+      enter-active-class="transform ease-out duration-300 transition"
+      enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
+      enter-to-class="translate-y-0 opacity-100 sm:translate-x-0"
+      leave-active-class="transition ease-in duration-100"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div v-if="toast.show" class="fixed bottom-4 right-4 z-50">
+        <div class="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl border"
+             :class="toast.type === 'success' ? 'bg-[#0d1525] border-emerald-500/50' : 'bg-[#0d1525] border-red-500/50'">
+          <UIcon :name="toast.type === 'success' ? 'i-heroicons-check-circle' : 'i-heroicons-exclamation-circle'"
+                 class="w-5 h-5"
+                 :class="toast.type === 'success' ? 'text-emerald-400' : 'text-red-400'" />
+          <span class="font-semibold text-sm text-white">{{ toast.message }}</span>
+        </div>
+      </div>
+    </Transition>
 
   </div>
 </template>

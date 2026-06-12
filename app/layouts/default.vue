@@ -5,36 +5,16 @@ import { useAuthStore } from '~/stores/auth'
 const auth = useAuthStore()
 const user = useSupabaseUser()
 
-// ── Responsive breakpoint detection ───────────────────────────────────────────
-const isMobile = ref(false)
-
-function updateBreakpoint() {
-  isMobile.value = window.innerWidth < 1024
-}
-
-onMounted(() => {
-  updateBreakpoint()
-  window.addEventListener('resize', updateBreakpoint)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', updateBreakpoint)
-})
-
 // ── Sidebar state ─────────────────────────────────────────────────────────────
-const open = ref(!isMobile.value)
+const open = ref(false)
+const collapsed = ref(false)
 
 const route = useRoute()
 watch(() => route.path, () => {
-  if (isMobile.value) open.value = false
+  open.value = false
 })
 
-watch(isMobile, (mobile) => {
-  if (!mobile) open.value = true
-  else open.value = false
-})
-
-// ── Display values — read directly from store ────────────────────────────────
+// ── Display values from store ────────────────────────────────────────────────
 const displayName = computed(() => auth.displayName)
 const displayRole = computed(() => auth.displayRole)
 const displayInitial = computed(() => auth.displayInitial)
@@ -45,243 +25,231 @@ const profileLoading = computed(() => auth.profileLoading)
 // ── Global search control ─────────────────────────────────────────────────────
 const { isOpen: showGlobalSearch } = useGlobalSearch()
 
-function getNavItems(state: 'expanded' | 'collapsed'): NavigationMenuItem[] {
-  return [
-    {
-      label: 'Dashboard',
-      icon:  'i-heroicons-squares-2x2',
-      to:    '/',
-    },
-    {
-      label: 'Calendar',
-      icon:  'i-heroicons-calendar-days',
-      to:    '/calendar',
-    },
-    ...(state === 'expanded'
-      ? [{ type: 'label' as const, label: 'Work' }]
-      : []),
-    {
-      label: 'Projects',
-      icon:  'i-heroicons-folder-open',
-      to:    '/projects',
-    },
-    {
-      label: 'Onboarding',
-      icon:  'i-heroicons-clipboard-document-list',
-      to:    '/onboarding',
-    },
-    ...(state === 'expanded'
-      ? [{ type: 'label' as const, label: 'Quick Access' }]
-      : []),
-    {
-      label: 'Library',
-      icon:  'i-heroicons-book-open',
-      to:    '/library',
-    },
-    {
-      label: 'Retainers',
-      icon:  'i-heroicons-banknotes',
-      to:    '/retainers',
-    },
-    {
-      label: 'Settings',
-      icon:  'i-heroicons-cog-6-tooth',
-      to:    '/settings',
-    },
-  ]
-}
+// ── Navigation Items ─────────────────────────────────────────────────────────
+const navItems = computed<NavigationMenuItem[]>(() => [
+  {
+    label: 'Dashboard',
+    icon:  'i-heroicons-squares-2x2',
+    to:    '/',
+  },
+  {
+    label: 'Calendar',
+    icon:  'i-heroicons-calendar-days',
+    to:    '/calendar',
+  },
+  { 
+    type: 'label', 
+    label: 'Work' 
+  },
+  {
+    label: 'Projects',
+    icon:  'i-heroicons-folder-open',
+    to:    '/projects',
+  },
+  {
+    label: 'Onboarding',
+    icon:  'i-heroicons-clipboard-document-list',
+    to:    '/onboarding',
+  },
+  { 
+    type: 'label', 
+    label: 'Quick Access' 
+  },
+  {
+    label: 'Library',
+    icon:  'i-heroicons-book-open',
+    to:    '/library',
+  },
+  {
+    label: 'Retainers',
+    icon:  'i-heroicons-banknotes',
+    to:    '/retainers',
+  },
+  {
+    label: 'Settings',
+    icon:  'i-heroicons-cog-6-tooth',
+    to:    '/settings',
+  },
+])
 </script>
 
 <template>
-  <div class="h-screen w-screen bg-base text-white flex flex-col overflow-hidden">
+  <UDashboardGroup class="bg-base text-white">
+    
+    <!-- Sidebar -->
+    <UDashboardSidebar
+      v-model:open="open"
+      v-model:collapsed="collapsed"
+      collapsible
+      resizable
+      :ui="{
+        root: 'bg-base border-r border-white/5 no-scrollbar',
+        header: 'h-16 border-b border-white/5 px-4 flex items-center',
+        body: 'px-2 py-4 no-scrollbar',
+        footer: 'border-t border-white/5 p-4',
+      }"
+    >
+      <!-- Desktop Sidebar Header -->
+      <template #header>
+        <NuxtLink to="/" class="flex items-center">
+          <img
+            v-if="!collapsed"
+            src="/img/clientbaselogo-white.png"
+            alt="Client Base OPS"
+            class="h-16 w-auto object-contain"
+          />
+          <img
+            v-else
+            src="/img/clientbaselogo-min.png"
+            alt="Client Base"
+            class="h-16 w-auto object-contain drop-shadow-lg"
+          />
+        </NuxtLink>
+      </template>
 
-    <!-- Mobile-only top bar -->
-    <header class="lg:hidden flex-none flex items-center justify-between px-5 py-4 bg-base border-b border-white/5 z-40">
-      <NuxtLink to="/">
-        <img src="/img/clientbaselogo-white.png" alt="Client Base OPS" class="h-12 w-auto object-contain" />
-      </NuxtLink>
-      <div class="flex items-center gap-2">
-        <!-- Global search button (mobile) -->
-        <button
-          class="p-2 text-slate-400 hover:text-white transition-colors"
-          aria-label="Search"
+      <template #default>
+        <!-- Desktop Search Bar -->
+        <UButton
+          v-if="!collapsed"
+          label="Search..."
+          icon="i-heroicons-magnifying-glass"
+          color="neutral"
+          variant="outline"
+          block
+          class="mb-4 text-slate-400 border-white/10 hover:bg-white/5 hover:text-white"
           @click="showGlobalSearch = true"
         >
-          <UIcon name="i-heroicons-magnifying-glass" class="w-5 h-5" />
-        </button>
+          <template #trailing>
+            <div class="flex items-center gap-0.5 ms-auto opacity-50">
+              <UKbd value="meta" variant="subtle" size="sm" />
+              <UKbd value="K" variant="subtle" size="sm" />
+            </div>
+          </template>
+        </UButton>
+        <UButton
+          v-else
+          icon="i-heroicons-magnifying-glass"
+          color="neutral"
+          variant="ghost"
+          block
+          class="mb-4 text-slate-400 hover:text-white"
+          @click="showGlobalSearch = true"
+        />
 
-        <button
-          class="p-2 text-slate-400 hover:text-white transition-colors"
-          aria-label="Open menu"
-          @click="open = true"
-        >
-          <UIcon name="i-heroicons-bars-3-bottom-left" class="w-6 h-6" />
-        </button>
-      </div>
-    </header>
-
-    <!-- Sidebar + Main -->
-    <div class="flex flex-1 overflow-hidden">
-
-      <USidebar
-        v-model:open="open"
-        :overlay="isMobile"
-        :close="isMobile"
-        close-icon="i-heroicons-x-mark"
-        collapsible="icon"
-        expand-on-hover
-        :ui="{
-          root: 'bg-base border-r border-white/5 shadow-2xl lg:shadow-none',
-          panel: 'bg-base border-r border-white/5',
-          header: 'h-16 border-b border-white/5 px-4 flex items-center',
-          body: 'px-2 py-2 mt-1',
-          footer: 'border-t border-white/5 px-0 py-0',
-          inner: 'bg-base divide-white/5',
-          container: 'h-full',
-        }"
-      >
-
-        <!-- Logo + mobile close button -->
-        <template #header>
-          <div class="flex items-center justify-between w-full h-full">
-            <NuxtLink to="/" class="flex items-center justify-center">
-              <Transition name="logo" mode="out-in">
-                <img
-                  v-if="open"
-                  key="full"
-                  src="/img/clientbaselogo-white.png"
-                  alt="Client Base OPS"
-                  class="h-12 w-auto object-contain"
-                />
-                <img
-                  v-else
-                  key="mini"
-                  src="/img/clientbaselogo-min.png"
-                  alt="Client Base"
-                  class="h-12 w-auto object-contain drop-shadow-lg"
-                />
-              </Transition>
-            </NuxtLink>
-
-            <button
-              v-if="isMobile"
-              class="p-2 text-slate-400 hover:text-white transition-colors"
-              aria-label="Close sidebar"
-              @click="open = false"
-            >
-              <UIcon name="i-heroicons-x-mark" class="w-5 h-5" />
-            </button>
-          </div>
-        </template>
-
-        <!-- Navigation -->
         <UNavigationMenu
-          :key="String(open)"
-          :items="getNavItems(open ? 'expanded' : 'collapsed')"
+          :items="navItems"
+          :collapsed="collapsed"
           orientation="vertical"
           :ui="{
-            root: 'w-full',
+            root: 'w-full no-scrollbar',
             link: [
               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium',
               'text-slate-400 hover:text-white hover:bg-white/5 transition-all duration-150',
               'data-[active=true]:bg-white/5 data-[active=true]:text-primary',
-              'overflow-hidden whitespace-nowrap',
             ],
-            linkLeadingIcon: 'size-5 shrink-0',
             label: 'pt-6 pb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-slate-600',
           }"
         />
+      </template>
 
-        <!-- User Profile + Logout -->
-        <template #footer>
-          <div v-if="user">
-
-            <!-- Loading -->
-            <div
-              v-if="profileLoading"
-              class="p-4 flex items-center gap-2"
-              :class="!open ? 'justify-center' : ''"
-            >
-              <UIcon name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin text-primary shrink-0" />
-              <span v-if="open" class="text-xs text-slate-400">Loading profile...</span>
-            </div>
-
-            <!-- Profile -->
-            <div
+      <template #footer>
+        <div v-if="user" class="w-full space-y-4">
+          <div 
+            class="flex items-center gap-3" 
+            :class="collapsed ? 'justify-center' : ''"
+          >
+            <UAvatar
+              v-if="avatarUrl"
+              :src="avatarUrl"
+              size="sm"
+              class="border-2 border-primary/50 shadow-lg"
+            />
+            <UAvatar
               v-else
-              class="flex items-center gap-3 p-4"
-              :class="!open ? 'justify-center px-2' : ''"
-            >
-              <img
-                v-if="avatarUrl"
-                :src="avatarUrl"
-                alt="Profile"
-                class="w-8 h-8 rounded-full object-cover border-2 border-primary/50 shrink-0 shadow-lg"
-              />
-              <div
-                v-else
-                class="w-8 h-8 rounded-full bg-primary flex items-center justify-center font-bold text-xs text-white shrink-0 shadow-lg"
-              >
-                {{ displayInitial }}
-              </div>
-
-              <Transition name="fade">
-                <div v-if="open" class="truncate min-w-0">
-                  <p class="text-xs font-bold text-white truncate">{{ displayName }}</p>
-                  <p class="text-[9px] text-slate-500 font-medium truncate">{{ displayRole }}</p>
-                </div>
-              </Transition>
+              :alt="displayInitial"
+              size="sm"
+              class="bg-primary text-white shadow-lg"
+            />
+            
+            <div v-if="!collapsed" class="truncate min-w-0">
+              <p class="text-xs font-bold text-white truncate">{{ displayName }}</p>
+              <p class="text-[9px] text-slate-500 font-medium truncate">{{ displayRole }}</p>
             </div>
-
-            <!-- Logout -->
-            <div class="border-t border-white/5">
-              <button
-                @click="auth.logout"
-                class="w-full px-4 py-3 text-[10px] font-bold uppercase text-red-400 hover:bg-red-500/10 transition-all flex items-center gap-2"
-                :class="!open ? 'justify-center' : ''"
-                :title="!open ? 'Logout' : ''"
-              >
-                <UIcon name="i-heroicons-arrow-left-on-rectangle" class="w-4 h-4 shrink-0" />
-                <span v-if="open">Logout</span>
-              </button>
-            </div>
-
           </div>
-        </template>
 
-      </USidebar>
-
-      <!-- Main content -->
-      <main class="flex-1 h-full overflow-y-auto overflow-x-hidden">
-        <div class="p-4 md:p-8">
-          <slot />
+          <UButton
+            icon="i-heroicons-arrow-left-on-rectangle"
+            label="Logout"
+            color="error"
+            variant="ghost"
+            block
+            :square="collapsed"
+            :truncate="!collapsed"
+            class="text-[10px] font-bold uppercase"
+            @click="auth.logout"
+          />
         </div>
-      </main>
+      </template>
+    </UDashboardSidebar>
 
-    </div>
+    <!-- Main Content Panel -->
+    <UDashboardPanel :ui="{
+      root: 'no-scrollbar'
+    }">
+      <template #header>
+        <!-- 
+          Requirement #1: Remove "Dashboard" title on mobile and use logo.
+          Requirement #2: Remove search icon from header.
+        -->
+        <UDashboardNavbar 
+          :ui="{
+            root: 'bg-base border-b border-white/5 no-scrollbar',
+            left: 'flex-1'
+          }"
+        >
+          <template #left>
+            <div class="flex items-center gap-2">
+              <!-- Hamburger toggle (mobile) / Collapse toggle (desktop) -->
+              <UDashboardSidebarCollapse class="text-slate-400 hover:text-white" />
+              
+              <!-- Requirement #1: Logo in the header for mobile/desktop context -->
+              <NuxtLink to="/" class="lg:hidden flex items-center">
+                <img
+                  src="/img/clientbaselogo-white.png"
+                  alt="Client Base OPS"
+                  class="h-16 w-auto object-contain"
+                />
+              </NuxtLink>
+            </div>
+          </template>
 
-    <!-- Global Search (Cmd+K) -->
+          <template #right>
+            <!-- Search removed from here as per Requirement #2 -->
+          </template>
+        </UDashboardNavbar>
+      </template>
+
+      <!-- Requirement #3: Hide scrollbar on large screens -->
+      <template #body>
+        <div class="flex-1 overflow-y-auto no-scrollbar">
+          <div class=" md:p-8">
+            <slot />
+          </div>
+        </div>
+      </template>
+    </UDashboardPanel>
+
     <GlobalSearch />
-  </div>
+  </UDashboardGroup>
 </template>
 
 <style scoped>
-.logo-enter-active,
-.logo-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+/* Requirement #3: CSS to hide scrollbars while maintaining scroll functionality */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
-.logo-enter-from,
-.logo-leave-to {
-  opacity: 0;
-  transform: scale(0.9);
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.15s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
 </style>

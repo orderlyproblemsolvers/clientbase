@@ -5,6 +5,7 @@ const query = ref('')
 const results = ref<any[]>([])
 const loading = ref(false)
 const debounceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+const inputRef = ref<HTMLInputElement | null>(null)
 
 // Debounced search
 watch(query, (newVal) => {
@@ -37,8 +38,19 @@ const handleKeydown = (e: KeyboardEvent) => {
     e.preventDefault()
     showSearch.value = !showSearch.value
   }
-  if (e.key === 'Escape') showSearch.value = false
+  if (e.key === 'Escape' && showSearch.value) {
+    showSearch.value = false
+  }
 }
+
+// Auto-focus input when modal opens & reset query
+watch(showSearch, (val) => {
+  if (val) {
+    query.value = ''
+    results.value = []
+    nextTick(() => inputRef.value?.focus())
+  }
+})
 
 onMounted(() => window.addEventListener('keydown', handleKeydown))
 onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
@@ -67,7 +79,7 @@ const entityColors: Record<string, string> = {
     <Transition name="modal">
       <div
         v-if="showSearch"
-        class="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] p-4"
+        class="fixed inset-0 z-50 flex items-start justify-center p-4 sm:pt-[15vh]"
         role="dialog"
         aria-modal="true"
       >
@@ -75,25 +87,25 @@ const entityColors: Record<string, string> = {
         <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="showSearch = false" />
 
         <!-- Panel -->
-        <div class="relative w-full max-w-xl bg-[#0d1525] border border-white/8 rounded-2xl shadow-2xl overflow-hidden">
+        <div class="relative w-full max-w-xl bg-[#0d1525] border border-white/8 rounded-2xl shadow-2xl overflow-hidden mt-16 sm:mt-0">
           <!-- Input -->
           <div class="flex items-center gap-3 px-5 py-4 border-b border-white/5">
-            <UIcon name="i-heroicons-magnifying-glass" class="w-5 h-5 text-slate-500" />
+            <UIcon name="i-heroicons-magnifying-glass" class="w-5 h-5 text-slate-500 shrink-0" />
             <input
+              ref="inputRef"
               v-model="query"
               type="text"
               placeholder="Search clients, projects, snippets, invoices…"
               class="w-full bg-transparent text-white text-sm placeholder-slate-600 focus:outline-none"
-              autofocus
               @keydown.escape="showSearch = false"
             />
-            <kbd class="hidden sm:inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg bg-white/5 border border-white/8 text-[10px] text-slate-500 font-semibold">
+            <kbd class="hidden sm:inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg bg-white/5 border border-white/8 text-[10px] text-slate-500 font-semibold shrink-0">
               <span class="text-xs">⌘</span>K
             </kbd>
           </div>
 
           <!-- Results -->
-          <div class="max-h-[60vh] overflow-y-auto p-2">
+          <div class="max-h-[50vh] sm:max-h-[60vh] overflow-y-auto p-2">
             <!-- Loading -->
             <div v-if="loading" class="flex justify-center py-10">
               <UIcon name="i-heroicons-arrow-path" class="w-6 h-6 animate-spin text-primary" />
