@@ -77,9 +77,10 @@ serve(async (_req) => {
       if (!shouldSend) continue;
 
       // Build email
-      const unsubscribeLink = inv.clients?.unsubscribe_token
-        ? `${SUPABASE_URL.replace(".supabase.co", "")}/unsubscribe?token=${inv.clients.unsubscribe_token}`
-        : "#";
+const APP_URL = Deno.env.get("APP_URL") || "http://localhost:3002";
+const unsubscribeLink = inv.clients?.unsubscribe_token
+  ? `${APP_URL}/unsubscribe?token=${inv.clients.unsubscribe_token}`
+  : "#";
 
       const html = `
         <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0f1e; color: #cbd5e1; padding: 24px; border-radius: 12px;">

@@ -4,14 +4,12 @@ const route   = useRoute()
 const supabase = useSupabaseClient()
 const user    = useSupabaseUser()
 
-// ── Safe Reactive Route Parameter ─────────────────────────────────────────────
 const projectId = computed(() => {
   const id = route.params.id
   if (!id || id === 'undefined' || id === 'null') return null
   return id
 })
 
-// ── State ─────────────────────────────────────────────────────────────────────
 const loading     = ref(true)
 const activeTab   = ref('secrets')
 const projectData = ref(null)
@@ -22,7 +20,6 @@ const uploading   = ref(false)
 const isDeleting  = ref(false)
 const copiedSecretId = ref(null)
 
-// Edit project
 const showEditModal  = ref(false)
 const savingEdit     = ref(false)
 const editForm = ref({
@@ -30,11 +27,9 @@ const editForm = ref({
   start_date: '', end_date: '', budget: '', currency: 'NGN',
 })
 
-// Secrets
 const showSecretModal = ref(false)
 const newSecret = ref({ name: '', value: '' })
 
-// Notes
 const isEditingNotes = ref(false)
 const notesDraft     = ref('')
 const isPreviewMode  = ref(false)
@@ -42,20 +37,18 @@ const isPreviewMode  = ref(false)
 const briefSubmission = ref(null)
 const briefForm       = ref(null)
 
-// Reminder config
 const reminderConfig = ref({
   enabled: false,
   frequency: 'weekly',
   custom_message: '',
-  recipient_email: '',   // NEW: recipient override
+  recipient_email: '',
 })
 const savingReminder = ref(false)
 const reminderLogs = ref<any[]>([])
 const loadingLogs = ref(false)
-const testEmailSending = ref(false)   // NEW
-const testEmailResult = ref('')       // NEW
+const testEmailSending = ref(false)
+const testEmailResult = ref('')
 
-// Toast
 const toast = ref({ show: false, message: '', type: 'success' })
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -64,7 +57,6 @@ const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
   toastTimer = setTimeout(() => { toast.value.show = false }, 3000)
 }
 
-// ── Share link ────────────────────────────────────────────────────────────────
 const shareToken = ref<string | null>(null)
 const generatingShareLink = ref(false)
 const copiedShareLink = ref(false)
@@ -114,13 +106,8 @@ const revokeShareLink = async () => {
   }
 }
 
-// ── Fetch ─────────────────────────────────────────────────────────────────────
 const fetchData = async () => {
-  if (!projectId.value) {
-    loading.value = false
-    return
-  }
-
+  if (!projectId.value) { loading.value = false; return }
   loading.value = true
   try {
     const { data: pData } = await supabase
@@ -128,13 +115,10 @@ const fetchData = async () => {
       .select('*, clients(id, name, category, website)')
       .eq('id', projectId.value)
       .single()
-
     projectData.value = pData
     clientData.value  = pData?.clients
     notesDraft.value  = pData?.notes || ''
-
     shareToken.value = pData?.share_token || null
-
     editForm.value = {
       name:        pData?.name        || '',
       description: pData?.description || '',
@@ -144,19 +128,12 @@ const fetchData = async () => {
       budget:      pData?.budget      ? String(pData.budget) : '',
       currency:    pData?.currency    || 'NGN',
     }
-
-    const sData = await $fetch('/api/secrets', {
-      query: { project_id: projectId.value }
-    })
+    const sData = await $fetch('/api/secrets', { query: { project_id: projectId.value } })
     secrets.value = sData?.map((s) => ({ ...s, isRevealed: false })) || []
-
     const { data: fData } = await supabase
-      .from('files')
-      .select('*')
-      .eq('project_id', projectId.value)
+      .from('files').select('*').eq('project_id', projectId.value)
       .order('created_at', { ascending: false })
     files.value = fData || []
-
     if (pData?.onboarding_submission_id) {
       const { data: subData } = await supabase
         .from('onboarding_submissions')
@@ -166,91 +143,57 @@ const fetchData = async () => {
       briefSubmission.value = subData
       briefForm.value       = subData?.onboarding_forms
     }
-  } catch (e) {
-    console.error(e)
-  } finally {
-    loading.value = false
-  }
+  } catch (e) { console.error(e) } finally { loading.value = false }
 }
 
-// ── Edit project ──────────────────────────────────────────────────────────────
 const saveEdit = async () => {
   if (!projectId.value) return
   savingEdit.value = true
   try {
-    const { error } = await supabase
-      .from('projects')
-      .update({
-        name: editForm.value.name,
-        description: editForm.value.description || null,
-        status: editForm.value.status,
-        start_date: editForm.value.start_date  || null,
-        end_date: editForm.value.end_date    || null,
-        budget: editForm.value.budget ? parseFloat(editForm.value.budget) : null,
-        currency: editForm.value.currency,
-        updated_at:  new Date().toISOString(),
-      })
-      .eq('id', projectId.value)
+    const { error } = await supabase.from('projects').update({
+      name: editForm.value.name,
+      description: editForm.value.description || null,
+      status: editForm.value.status,
+      start_date: editForm.value.start_date  || null,
+      end_date: editForm.value.end_date    || null,
+      budget: editForm.value.budget ? parseFloat(editForm.value.budget) : null,
+      currency: editForm.value.currency,
+      updated_at:  new Date().toISOString(),
+    }).eq('id', projectId.value)
     if (error) throw error
     showEditModal.value = false
     await fetchData()
-  } catch (e) {
-    alert('Error saving: ' + e.message)
-  } finally {
-    savingEdit.value = false
-  }
+  } catch (e) { alert('Error saving: ' + e.message) } finally { savingEdit.value = false }
 }
 
-// ── Notes ─────────────────────────────────────────────────────────────────────
 const saveNotes = async () => {
   if (!projectId.value) return
   try {
-    const { error } = await supabase
-      .from('projects')
-      .update({ notes: notesDraft.value, updated_at: new Date().toISOString() })
-      .eq('id', projectId.value)
+    const { error } = await supabase.from('projects').update({ notes: notesDraft.value, updated_at: new Date().toISOString() }).eq('id', projectId.value)
     if (error) throw error
     projectData.value.notes = notesDraft.value
     isEditingNotes.value = false
     isPreviewMode.value  = false
-  } catch (e) {
-    alert('Save failed: ' + e.message)
-  }
+  } catch (e) { alert('Save failed: ' + e.message) }
 }
 
-// ── Secrets ───────────────────────────────────────────────────────────────────
 const addSecret = async () => {
-  if (!projectId.value) {
-    alert('Project ID missing')
-    return
-  }
+  if (!projectId.value) { alert('Project ID missing'); return }
   if (!newSecret.value.name || !newSecret.value.value) return
-
   try {
     await $fetch('/api/secrets', {
       method: 'POST',
-      body: {
-        user_id:  user.value.sub,
-        client_id: clientData.value?.id || null,
-        project_id: projectId.value,
-        key_name: newSecret.value.name,
-        value: newSecret.value.value
-      }
+      body: { user_id: user.value.sub, client_id: clientData.value?.id || null, project_id: projectId.value, key_name: newSecret.value.name, value: newSecret.value.value }
     })
     showSecretModal.value = false
     newSecret.value = { name: '', value: '' }
     await fetchData()
-  } catch (e) {
-    alert(e.message || 'Error saving secret')
-  }
+  } catch (e) { alert(e.message || 'Error saving secret') }
 }
 
 const deleteSecret = async (id) => {
   if (!confirm('Delete this secret?')) return
-  await $fetch('/api/secrets', {
-    method: 'DELETE',
-    query: { id }
-  })
+  await $fetch('/api/secrets', { method: 'DELETE', query: { id } })
   await fetchData()
 }
 
@@ -260,136 +203,82 @@ const copyToClipboard = (text, id) => {
   setTimeout(() => (copiedSecretId.value = null), 2000)
 }
 
-// ── Files ─────────────────────────────────────────────────────────────────────
 const handleFileUpload = async (event) => {
   if (!projectId.value) return
   const file = event.target.files[0]
   if (!file) return
   uploading.value = true
   try {
-    const ext      = file.name.split('.').pop()
+    const ext = file.name.split('.').pop()
     const fileName = `${crypto.randomUUID()}.${ext}`
     const filePath = `${user.value?.id}/${projectId.value}/${fileName}`
-
-    const { error: uploadError } = await supabase.storage
-      .from('project_files')
-      .upload(filePath, file)
+    const { error: uploadError } = await supabase.storage.from('project_files').upload(filePath, file)
     if (uploadError) throw uploadError
-
     const { error: dbError } = await supabase.from('files').insert({
-      project_id: projectId.value,
-      file_name:  file.name,
-      file_path:  filePath,
-      file_type:  file.type,
-      client_id:  clientData.value?.id || null,
+      project_id: projectId.value, file_name: file.name, file_path: filePath, file_type: file.type, client_id: clientData.value?.id || null,
     })
     if (dbError) throw dbError
     await fetchData()
-  } catch (e) {
-    alert(e.message)
-  } finally {
-    uploading.value = false
-  }
+  } catch (e) { alert(e.message) } finally { uploading.value = false }
 }
 
 const downloadFile = async (path) => {
-  const { data } = await supabase.storage
-    .from('project_files')
-    .createSignedUrl(path, 60)
+  const { data } = await supabase.storage.from('project_files').createSignedUrl(path, 60)
   if (data?.signedUrl) window.open(data.signedUrl, '_blank')
 }
 
-// ── Delete project ────────────────────────────────────────────────────────────
 const deleteProject = async () => {
   if (!projectId.value) return
   if (!confirm('Permanently delete this project and all its data?')) return
   isDeleting.value = true
   try {
-    const { data: filesToDelete } = await supabase
-      .from('files')
-      .select('file_path')
-      .eq('project_id', projectId.value)
-
+    const { data: filesToDelete } = await supabase.from('files').select('file_path').eq('project_id', projectId.value)
     if (filesToDelete?.length) {
-      await supabase.storage
-        .from('project_files')
-        .remove(filesToDelete.map((f) => f.file_path))
+      await supabase.storage.from('project_files').remove(filesToDelete.map((f) => f.file_path))
     }
-
     await supabase.from('projects').delete().eq('id', projectId.value)
     return navigateTo(clientData.value ? `/clients/${clientData.value.id}` : '/')
-  } catch (e) {
-    alert('Error: ' + e.message)
-  } finally {
-    isDeleting.value = false
-  }
+  } catch (e) { alert('Error: ' + e.message) } finally { isDeleting.value = false }
 }
 
-// ── Reminder config ───────────────────────────────────────────────────────────
 const fetchReminderConfig = async () => {
-  const { data } = await supabase
-    .from('invoice_reminder_configs')
-    .select('*')
-    .eq('project_id', projectId.value)
-    .single()
+  const { data } = await supabase.from('invoice_reminder_configs').select('*').eq('project_id', projectId.value).single()
   if (data) reminderConfig.value = data
 }
 
 const saveReminderConfig = async () => {
   savingReminder.value = true
   try {
-    const { error } = await supabase
-      .from('invoice_reminder_configs')
-      .upsert({
-        project_id: projectId.value,
-        enabled: reminderConfig.value.enabled,
-        frequency: reminderConfig.value.frequency,
-        custom_message: reminderConfig.value.custom_message,
-        recipient_email: reminderConfig.value.recipient_email || null,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'project_id' })   // <-- fix here
+    const { error } = await supabase.from('invoice_reminder_configs').upsert({
+      project_id: projectId.value,
+      enabled: reminderConfig.value.enabled,
+      frequency: reminderConfig.value.frequency,
+      custom_message: reminderConfig.value.custom_message,
+      recipient_email: reminderConfig.value.recipient_email || null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'project_id' })
     if (error) throw error
     showToast('Reminder settings saved!')
-  } catch (e: any) {
-    showToast(e.message, 'error')
-  } finally { savingReminder.value = false }
+  } catch (e: any) { showToast(e.message, 'error') } finally { savingReminder.value = false }
 }
 
 const fetchReminderLogs = async () => {
   loadingLogs.value = true
-  const { data } = await supabase
-    .from('invoice_reminder_logs')
-    .select('*')
-    .eq('project_id', projectId.value)
-    .order('sent_at', { ascending: false })
-    .limit(20)
+  const { data } = await supabase.from('invoice_reminder_logs').select('*').eq('project_id', projectId.value).order('sent_at', { ascending: false }).limit(20)
   reminderLogs.value = data || []
   loadingLogs.value = false
 }
 
-// NEW: Send test email
 const sendTestEmail = async () => {
-  testEmailSending.value = true
-  testEmailResult.value = ''
+  testEmailSending.value = true; testEmailResult.value = ''
   try {
-    await $fetch('/api/send-test-reminder', {
-      method: 'POST',
-      body: {
-        project_id: projectId.value,
-        recipient_email: reminderConfig.value.recipient_email,  // <-- pass the override
-      },
-    })
+    await $fetch('/api/send-test-reminder', { method: 'POST', body: { project_id: projectId.value, recipient_email: reminderConfig.value.recipient_email } })
     testEmailResult.value = 'sent'
     showToast('Test email sent! Check your inbox.')
-  } catch (e: any) {
-    testEmailResult.value = 'failed'
-    showToast(e.message || 'Failed to send test email', 'error')
-  } finally {
-    testEmailSending.value = false
-  }
+  } catch (e: any) { testEmailResult.value = 'failed'; showToast(e.message || 'Failed to send test email', 'error') }
+  finally { testEmailSending.value = false }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 const statusConfig: Record<string, { label: string; dot: string; badge: string }> = {
   lead:     { label: 'Lead',     dot: 'bg-slate-400',   badge: 'text-slate-300  bg-slate-400/10  border-slate-400/20'  },
   proposal: { label: 'Proposal', dot: 'bg-blue-400',    badge: 'text-blue-300   bg-blue-400/10   border-blue-400/20'   },
@@ -412,16 +301,32 @@ const tabs = [
   { key: 'reminders',  label: 'Reminders',  icon: 'i-heroicons-bell-alert' },
 ]
 
+const isSmallScreen = ref(false)
+function onResize() { isSmallScreen.value = window.innerWidth < 640 }
+onMounted(() => { onResize(); window.addEventListener('resize', onResize) })
+onUnmounted(() => window.removeEventListener('resize', onResize))
+
+const mobilePriorityKeys = ['secrets', 'notes', 'files', 'milestones']
+const desktopPriorityKeys = ['secrets', 'notes', 'files', 'milestones', 'calendar']
+const visiblePriorityTabs = computed(() => {
+  const keys = isSmallScreen.value ? mobilePriorityKeys : desktopPriorityKeys
+  return tabs.filter(t => keys.includes(t.key))
+})
+const overflowTabs = computed(() => tabs.filter(t => !visiblePriorityTabs.value.map(v => v.key).includes(t.key)))
+const showOverflow = ref(false)
+
+const switchTab = (key: string) => {
+  activeTab.value = key
+  showOverflow.value = false
+}
+
 const highlightedNotes = computed(() => {
   if (!notesDraft.value) return ''
   return $md.render(notesDraft.value)
 })
 
 watch(activeTab, (tab) => {
-  if (tab === 'reminders') {
-    fetchReminderConfig()
-    fetchReminderLogs()
-  }
+  if (tab === 'reminders') { fetchReminderConfig(); fetchReminderLogs() }
 })
 
 onMounted(() => fetchData())
@@ -430,8 +335,8 @@ onMounted(() => fetchData())
 <template>
   <div class="min-h-screen bg-base font-sans">
 
-    <!-- Breadcrumb -->
-    <nav class="flex items-center gap-1.5 text-sm text-slate-500 mb-8" aria-label="Breadcrumb">
+    <!-- Breadcrumb (wrapping) -->
+    <nav class="flex flex-wrap items-center gap-1.5 text-sm text-slate-500 mb-6" aria-label="Breadcrumb">
       <NuxtLink to="/" class="flex items-center gap-1.5 hover:text-slate-300 transition-colors duration-150">
         <UIcon name="i-heroicons-squares-2x2" class="w-4 h-4" />
         <span>Dashboard</span>
@@ -440,12 +345,12 @@ onMounted(() => fetchData())
       <NuxtLink
         v-if="clientData"
         :to="`/clients/${clientData.id}`"
-        class="hover:text-slate-300 transition-colors duration-150"
+        class="hover:text-slate-300 transition-colors duration-150 truncate max-w-[120px]"
       >
         {{ clientData.name }}
       </NuxtLink>
       <UIcon v-if="clientData" name="i-heroicons-chevron-right" class="w-3.5 h-3.5 text-slate-600" />
-      <span class="text-slate-300 truncate max-w-48">{{ projectData?.name || '…' }}</span>
+      <span class="text-slate-300 truncate max-w-[160px]">{{ projectData?.name || '…' }}</span>
     </nav>
 
     <!-- Loading Skeleton -->
@@ -467,163 +372,138 @@ onMounted(() => fetchData())
     <div v-else-if="projectData" class="space-y-8">
 
       <!-- ===== Hero Header ===== -->
-      <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/[0.04] via-white/[0.02] to-transparent border border-white/6 p-6 md:p-8">
+      <!-- Mobile layout (visible < lg) -->
+      <div class="lg:hidden rounded-2xl bg-gradient-to-br from-white/[0.04] via-white/[0.02] to-transparent border border-white/6 p-5 space-y-5">
+        <div class="flex items-center gap-4">
+          <div class="w-14 h-14 rounded-2xl bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
+            <span class="text-primary font-bold text-lg tracking-tight">
+              {{ projectData.name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase() || '?' }}
+            </span>
+          </div>
+          <div class="min-w-0">
+            <h1 class="text-xl font-bold text-white tracking-tight truncate">{{ projectData.name }}</h1>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border mt-1"
+                  :class="statusConfig[projectData.status]?.badge">
+              <span class="w-1.5 h-1.5 rounded-full" :class="statusConfig[projectData.status]?.dot"></span>
+              {{ statusConfig[projectData.status]?.label }}
+            </span>
+            <NuxtLink v-if="clientData" :to="`/clients/${clientData.id}`" class="block mt-1 text-sm text-slate-400 hover:text-primary transition-colors">
+              {{ clientData.name }}
+            </NuxtLink>
+          </div>
+        </div>
+        <p v-if="projectData.description" class="text-sm text-slate-400 leading-relaxed">{{ projectData.description }}</p>
+        <div class="flex items-center gap-2 flex-wrap">
+          <button v-if="!shareToken" @click="generateShareLink" :disabled="generatingShareLink"
+                  class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all active:scale-[0.98]">
+            <UIcon v-if="generatingShareLink" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
+            <UIcon v-else name="i-heroicons-share" class="w-4 h-4" /> Share with Client
+          </button>
+          <template v-else>
+            <button @click="copyShareLink" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary/10 border border-primary/20 active:scale-[0.98]">
+              <UIcon :name="copiedShareLink ? 'i-heroicons-check' : 'i-heroicons-link'" class="w-4 h-4" /> {{ copiedShareLink ? 'Copied!' : 'Copy Link' }}
+            </button>
+            <button @click="revokeShareLink" class="p-2.5 rounded-xl text-slate-400 hover:text-red-400 bg-white/5 border border-white/6">
+              <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
+            </button>
+          </template>
+          <button @click="showEditModal = true" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-white/5 border border-white/6 active:scale-[0.98]">
+            <UIcon name="i-heroicons-pencil-square" class="w-4 h-4" /> Edit
+          </button>
+        </div>
+        <!-- Meta Cards -->
+        <div class="grid grid-cols-2 gap-3 pt-4 border-t border-white/5">
+          <div class="flex items-center gap-2"><UIcon name="i-heroicons-calendar-days" class="w-4 h-4 text-slate-400" /><div><p class="text-[10px] text-slate-500">Start</p><p class="text-sm text-white">{{ projectData.start_date ? new Date(projectData.start_date).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }) : '—' }}</p></div></div>
+          <div class="flex items-center gap-2"><UIcon name="i-heroicons-calendar-days" class="w-4 h-4 text-slate-400" /><div><p class="text-[10px] text-slate-500">End</p><p class="text-sm text-white">{{ projectData.end_date ? new Date(projectData.end_date).toLocaleDateString() : '—' }}</p></div></div>
+          <div class="flex items-center gap-2"><UIcon name="i-heroicons-banknotes" class="w-4 h-4 text-slate-400" /><div><p class="text-[10px] text-slate-500">Budget</p><p class="text-sm text-white">{{ projectData.budget ? formatBudget(projectData.budget, projectData.currency) : '—' }}</p></div></div>
+          <div class="flex items-center gap-2"><UIcon name="i-heroicons-currency-dollar" class="w-4 h-4 text-slate-400" /><div><p class="text-[10px] text-slate-500">Currency</p><p class="text-sm text-white">{{ projectData.currency }}</p></div></div>
+        </div>
+      </div>
+
+      <!-- Desktop layout (hidden < lg) -->
+      <div class="hidden lg:block relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/[0.04] via-white/[0.02] to-transparent border border-white/6 p-6 md:p-8">
         <div class="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none"></div>
-        
         <div class="relative z-10 flex flex-col lg:flex-row lg:items-start justify-between gap-6">
           <div class="flex items-start gap-5">
             <div class="w-16 h-16 rounded-2xl bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
-              <span class="text-primary font-bold text-xl tracking-tight">
-                {{ projectData.name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase() || '?' }}
-              </span>
+              <span class="text-primary font-bold text-xl tracking-tight">{{ projectData.name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase() || '?' }}</span>
             </div>
-
             <div class="space-y-3">
               <div>
                 <div class="flex items-center gap-3 flex-wrap mb-2">
-                  <h1 class="text-2xl md:text-3xl font-bold text-white tracking-tight">
-                    {{ projectData.name }}
-                  </h1>
-                  <span
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border"
-                    :class="statusConfig[projectData.status]?.badge || statusConfig.active.badge"
-                  >
-                    <span class="w-1.5 h-1.5 rounded-full" :class="statusConfig[projectData.status]?.dot || 'bg-emerald-400'" aria-hidden="true"></span>
-                    {{ statusConfig[projectData.status]?.label || projectData.status }}
+                  <h1 class="text-2xl md:text-3xl font-bold text-white tracking-tight">{{ projectData.name }}</h1>
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border" :class="statusConfig[projectData.status]?.badge">
+                    <span class="w-1.5 h-1.5 rounded-full" :class="statusConfig[projectData.status]?.dot"></span> {{ statusConfig[projectData.status]?.label }}
                   </span>
                 </div>
-
-                <NuxtLink
-                  v-if="clientData"
-                  :to="`/clients/${clientData.id}`"
-                  class="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-primary transition-colors duration-150"
-                >
-                  <UIcon name="i-heroicons-building-office-2" class="w-4 h-4" />
-                  <span>{{ clientData.name }}</span>
+                <NuxtLink v-if="clientData" :to="`/clients/${clientData.id}`" class="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-primary transition-colors">
+                  <UIcon name="i-heroicons-building-office-2" class="w-4 h-4" /> {{ clientData.name }}
                 </NuxtLink>
               </div>
-
-              <p v-if="projectData.description" class="text-slate-400 text-sm max-w-2xl leading-relaxed">
-                {{ projectData.description }}
-              </p>
+              <p v-if="projectData.description" class="text-slate-400 text-sm max-w-2xl leading-relaxed">{{ projectData.description }}</p>
             </div>
           </div>
-
-          <!-- Right: Actions -->
           <div class="flex items-center gap-2 shrink-0 lg:self-start">
-            <button
-              v-if="!shareToken"
-              @click="generateShareLink"
-              :disabled="generatingShareLink"
-              class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-white/5 hover:bg-white/8 border border-white/6 hover:border-white/10 transition-all duration-150 active:scale-[0.98] shrink-0"
-              aria-label="Generate client share link"
-            >
-              <UIcon v-if="generatingShareLink" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
-              <UIcon v-else name="i-heroicons-share" class="w-4 h-4" />
-              <span class="hidden sm:inline">Share with Client</span>
+            <button v-if="!shareToken" @click="generateShareLink" :disabled="generatingShareLink" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all active:scale-[0.98]">
+              <UIcon v-if="generatingShareLink" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" /> <UIcon v-else name="i-heroicons-share" class="w-4 h-4" /> <span class="hidden sm:inline">Share with Client</span>
             </button>
             <template v-else>
-              <button
-                @click="copyShareLink"
-                class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary/10 hover:bg-primary/20 border border-primary/20 hover:border-primary/30 transition-all duration-150 active:scale-[0.98] shrink-0"
-                aria-label="Copy client share link"
-              >
-                <UIcon :name="copiedShareLink ? 'i-heroicons-check' : 'i-heroicons-link'" class="w-4 h-4" />
-                <span class="hidden sm:inline">{{ copiedShareLink ? 'Copied!' : 'Copy Client Link' }}</span>
+              <button @click="copyShareLink" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary/10 hover:bg-primary/20 border border-primary/20 transition-all active:scale-[0.98]">
+                <UIcon :name="copiedShareLink ? 'i-heroicons-check' : 'i-heroicons-link'" class="w-4 h-4" /> <span class="hidden sm:inline">{{ copiedShareLink ? 'Copied!' : 'Copy Client Link' }}</span>
               </button>
-              <button
-                @click="revokeShareLink"
-                class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-red-400 bg-white/5 hover:bg-red-500/10 border border-white/6 hover:border-red-500/20 transition-all duration-150 shrink-0"
-                aria-label="Revoke share link"
-                title="Revoke link"
-              >
+              <button @click="revokeShareLink" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-red-400 bg-white/5 border border-white/6 transition-all">
                 <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
               </button>
             </template>
-            <button
-              @click="showEditModal = true"
-              class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-white/5 hover:bg-white/8 border border-white/6 hover:border-white/10 transition-all duration-150 active:scale-[0.98] shrink-0"
-              aria-label="Edit project"
-            >
-              <UIcon name="i-heroicons-pencil-square" class="w-4 h-4" />
-              <span class="hidden sm:inline">Edit</span>
+            <button @click="showEditModal = true" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all active:scale-[0.98]">
+              <UIcon name="i-heroicons-pencil-square" class="w-4 h-4" /> <span class="hidden sm:inline">Edit</span>
             </button>
           </div>
         </div>
-
-        <!-- Meta Cards inline -->
         <div class="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-white/5">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-slate-700/50 flex items-center justify-center shrink-0">
-              <UIcon name="i-heroicons-calendar-days" class="w-4 h-4 text-slate-400" />
-            </div>
-            <div class="min-w-0">
-              <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">Start</p>
-              <p class="text-sm font-medium text-white truncate">
-                {{ projectData.start_date
-                  ? new Date(projectData.start_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-                  : '—' }}
-              </p>
-            </div>
-          </div>
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-slate-700/50 flex items-center justify-center shrink-0">
-              <UIcon name="i-heroicons-calendar-days" class="w-4 h-4 text-slate-400" />
-            </div>
-            <div class="min-w-0">
-              <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">End</p>
-              <p class="text-sm font-medium text-white truncate">
-                {{ projectData.end_date
-                  ? new Date(projectData.end_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-                  : '—' }}
-              </p>
-            </div>
-          </div>
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-slate-700/50 flex items-center justify-center shrink-0">
-              <UIcon name="i-heroicons-banknotes" class="w-4 h-4 text-slate-400" />
-            </div>
-            <div class="min-w-0">
-              <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">Budget</p>
-              <p class="text-sm font-medium text-white truncate">
-                {{ projectData.budget ? formatBudget(projectData.budget, projectData.currency) : '—' }}
-              </p>
-            </div>
-          </div>
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-slate-700/50 flex items-center justify-center shrink-0">
-              <UIcon name="i-heroicons-currency-dollar" class="w-4 h-4 text-slate-400" />
-            </div>
-            <div class="min-w-0">
-              <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">Currency</p>
-              <p class="text-sm font-medium text-white">{{ projectData.currency }}</p>
-            </div>
-          </div>
+          <div class="flex items-center gap-3"><UIcon name="i-heroicons-calendar-days" class="w-4 h-4 text-slate-400" /><div><p class="text-[10px] text-slate-500 mb-0.5">Start</p><p class="text-sm text-white">{{ projectData.start_date ? new Date(projectData.start_date).toLocaleDateString() : '—' }}</p></div></div>
+          <div class="flex items-center gap-3"><UIcon name="i-heroicons-calendar-days" class="w-4 h-4 text-slate-400" /><div><p class="text-[10px] text-slate-500 mb-0.5">End</p><p class="text-sm text-white">{{ projectData.end_date ? new Date(projectData.end_date).toLocaleDateString() : '—' }}</p></div></div>
+          <div class="flex items-center gap-3"><UIcon name="i-heroicons-banknotes" class="w-4 h-4 text-slate-400" /><div><p class="text-[10px] text-slate-500 mb-0.5">Budget</p><p class="text-sm text-white">{{ projectData.budget ? formatBudget(projectData.budget, projectData.currency) : '—' }}</p></div></div>
+          <div class="flex items-center gap-3"><UIcon name="i-heroicons-currency-dollar" class="w-4 h-4 text-slate-400" /><div><p class="text-[10px] text-slate-500 mb-0.5">Currency</p><p class="text-sm text-white">{{ projectData.currency }}</p></div></div>
         </div>
       </div>
 
-      <!-- ===== Tabs ===== -->
-      <div class="bg-white/5 p-1 rounded-xl flex gap-1 overflow-x-auto">
-        <button
-          v-for="tab in tabs"
-          :key="tab.key"
-          @click="activeTab = tab.key"
-          :class="[
-            'flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all duration-150 flex items-center justify-center gap-2 whitespace-nowrap',
-            activeTab === tab.key
-              ? 'bg-primary text-white shadow-lg shadow-primary/20'
-              : 'text-slate-400 hover:text-white hover:bg-white/5'
-          ]"
-          :aria-label="tab.label"
-          :aria-selected="activeTab === tab.key"
-          role="tab"
-        >
-          <UIcon :name="tab.icon" class="w-4 h-4" />
-          <span class="hidden sm:inline">{{ tab.label }}</span>
-        </button>
+      <!-- ===== Tabs (priority + overflow) ===== -->
+      <div class="flex items-center gap-1">
+        <div class="flex items-center gap-1 overflow-hidden">
+          <button
+            v-for="tab in visiblePriorityTabs"
+            :key="tab.key"
+            @click="activeTab = tab.key"
+            :class="[
+              'py-2.5 px-4 rounded-lg text-sm font-semibold transition-all duration-150 flex items-center justify-center gap-2 whitespace-nowrap',
+              activeTab === tab.key ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-400 hover:text-white hover:bg-white/5'
+            ]"
+          >
+            <UIcon :name="tab.icon" class="w-4 h-4" />
+            <span class="hidden sm:inline">{{ tab.label }}</span>
+          </button>
+        </div>
+        <div v-if="overflowTabs.length" class="relative">
+          <button
+            @click="showOverflow = !showOverflow"
+            class="p-2 text-slate-400 hover:text-white transition-colors"
+            :class="{ 'text-primary': showOverflow }"
+          >
+            <UIcon name="i-heroicons-ellipsis-vertical" class="w-5 h-5" />
+          </button>
+          <Transition name="fade">
+            <div v-if="showOverflow" class="absolute right-0 mt-2 w-44 bg-[#0d1525] border border-white/8 rounded-2xl shadow-2xl py-1 z-30">
+              <button v-for="tab in overflowTabs" :key="tab.key" @click="switchTab(tab.key)"
+                      class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-colors first:rounded-t-xl last:rounded-b-xl">
+                <UIcon :name="tab.icon" class="w-4 h-4" /> {{ tab.label }}
+              </button>
+            </div>
+          </Transition>
+        </div>
       </div>
 
-      <!-- ===== Tab Content ===== -->
+      <!-- ===== Tab Content (unchanged) ===== -->
       <div class="min-h-[400px]">
         <!-- SECRETS TAB -->
         <div v-if="activeTab === 'secrets'" class="space-y-5">
@@ -712,12 +592,12 @@ onMounted(() => fetchData())
 
         <!-- NOTES TAB -->
         <div v-if="activeTab === 'notes'" class="space-y-5">
-          <div class="flex items-center justify-between">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 class="text-lg font-semibold text-white">Notes</h2>
               <p class="text-xs text-slate-500 mt-0.5">Markdown supported · project context & documentation</p>
             </div>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap items-center gap-2">
               <button
                 v-if="!isEditingNotes"
                 @click="isEditingNotes = true"
@@ -948,7 +828,6 @@ onMounted(() => fetchData())
               </label>
 
               <div v-if="reminderConfig.enabled" class="space-y-4 pl-7">
-                <!-- Recipient email override -->
                 <div class="space-y-1.5">
                   <label class="text-xs font-semibold text-slate-400">Recipient Email (optional override)</label>
                   <input v-model="reminderConfig.recipient_email" type="email"
@@ -956,7 +835,6 @@ onMounted(() => fetchData())
                          class="w-full sm:w-64 bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none" />
                 </div>
 
-                <!-- Frequency -->
                 <div class="space-y-1.5">
                   <label class="text-xs font-semibold text-slate-400">Frequency</label>
                   <div class="relative w-full sm:w-48">
@@ -972,7 +850,6 @@ onMounted(() => fetchData())
                   </div>
                 </div>
 
-                <!-- Custom message -->
                 <div class="space-y-1.5">
                   <label class="text-xs font-semibold text-slate-400">Custom Message (optional)</label>
                   <textarea v-model="reminderConfig.custom_message" rows="3"
@@ -980,7 +857,6 @@ onMounted(() => fetchData())
                             class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none"></textarea>
                 </div>
 
-                <!-- Test email button -->
                 <div class="pt-2">
                   <button @click="sendTestEmail" :disabled="testEmailSending"
                           class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-white/5 hover:bg-white/8 border border-white/6 text-slate-400 hover:text-white transition-all">
@@ -1222,36 +1098,21 @@ onMounted(() => fetchData())
 </template>
 
 <style scoped>
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 200ms ease;
-}
-.modal-enter-active .relative,
-.modal-leave-active .relative {
-  transition: transform 200ms cubic-bezier(0.32, 0.72, 0, 1);
-}
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-.modal-enter-from .relative {
-  transform: translateY(24px) scale(0.98);
-}
-@media (max-width: 639px) {
-  .modal-enter-from .relative {
-    transform: translateY(100%);
-  }
-}
-
+.modal-enter-active, .modal-leave-active { transition: opacity 200ms ease; }
+.modal-enter-active .relative, .modal-leave-active .relative { transition: transform 200ms cubic-bezier(0.32, 0.72, 0, 1); }
+.modal-enter-from, .modal-leave-to { opacity: 0; }
+.modal-enter-from .relative { transform: translateY(24px) scale(0.98); }
+@media (max-width: 639px) { .modal-enter-from .relative { transform: translateY(100%); } }
 textarea::-webkit-scrollbar { width: 8px; }
 textarea::-webkit-scrollbar-track { background: transparent; }
 textarea::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
 textarea::-webkit-scrollbar-thumb:hover { background: #475569; }
-
 :deep(.prose) { color: #cbd5e1; }
 :deep(.prose h1), :deep(.prose h2), :deep(.prose h3) { color: white; font-weight: 700; }
 :deep(.prose code) { background: #1e293b; color: #818cf8; padding: 0.2em 0.4em; border-radius: 4px; }
 :deep(.prose pre) { background: #0f172a; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; }
 :deep(.prose a) { color: #818cf8; }
 :deep(.prose blockquote) { border-left-color: #818cf8; color: #94a3b8; }
+.fade-enter-active, .fade-leave-active { transition: opacity 0.15s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>
