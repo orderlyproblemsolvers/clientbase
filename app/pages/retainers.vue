@@ -565,7 +565,7 @@ onMounted(() => fetchData())
                 </span>
               </td>
               <td class="p-4 sm:p-5 text-right" @click.stop>
-                <div class="flex justify-end items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                <div class="flex justify-end items-center gap-2 duration-150">
                   <button @click="openPrintView(r.id)" class="p-2 rounded-xl hover:bg-white/8 text-slate-400 hover:text-white transition-colors" title="Print">
                     <UIcon name="i-heroicons-printer" class="w-4 h-4" />
                   </button>
