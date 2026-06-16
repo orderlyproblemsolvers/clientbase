@@ -10,6 +10,11 @@ export default defineNuxtConfig({
     '@pinia/nuxt',
     '@nuxtjs/supabase'
   ],
+  ui: {
+    colorMode: false
+  },
+
+
   app: {
     head: {
       title: "Clientbase by OPS",
@@ -32,6 +37,9 @@ export default defineNuxtConfig({
       link: [
         { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
       ],
+            htmlAttrs: {
+        class: 'dark'
+      }
     },
   },
   css: ['~/assets/css/main.css'],
