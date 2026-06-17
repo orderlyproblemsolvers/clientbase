@@ -2,7 +2,6 @@
 const supabase = useSupabaseClient()
 const user     = useSupabaseUser()
 
-// ── State ─────────────────────────────────────────────────────────────────────
 const loading      = ref(true)
 const fetchError   = ref('')
 const retainers    = ref<any[]>([])
@@ -12,19 +11,16 @@ const searchQuery  = ref('')
 const filterStatus = ref('all')
 const toast        = ref({ show: false, message: '', type: 'success' })
 
-// Modals
 const showCreateModal   = ref(false)
 const showDetailModal   = ref(false)
 const showTemplatePanel = ref(false)
 const selectedInvoice   = ref<any>(null)
 const saving            = ref(false)
 
-// Delete confirmation
 const showDeleteConfirm = ref(false)
 const deletingInvoiceId = ref<string | null>(null)
 const deletingInvoice   = ref(false)
 
-// ── Create form ───────────────────────────────────────────────────────────────
 const useLineItems = ref(true)
 const lineItems    = ref([{ description: '', quantity: 1, unit_rate: 0 }])
 
@@ -51,7 +47,6 @@ const form = ref({
   template_id:  '' as string | null,
 })
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 const showToast = (msg: string, type = 'success') => {
   toast.value = { show: true, message: msg, type }
   setTimeout(() => toast.value.show = false, 3000)
@@ -76,7 +71,6 @@ const getUserId = async () => {
   return id
 }
 
-// ── Computed ──────────────────────────────────────────────────────────────────
 const lineItemsTotal = computed(() =>
   lineItems.value.reduce((s, i) => s + i.quantity * i.unit_rate, 0)
 )
@@ -113,7 +107,6 @@ const structureLabel: Record<string, string> = {
   recurring: 'Recurring',
 }
 
-// ✅ Fixed stats: outstanding includes both pending and overdue
 const stats = computed(() => {
   if (!retainers.value.length) return { revenue: 0, outstanding: 0, overdueCount: 0, activeClients: 0 }
   const paid    = retainers.value.filter(r => r.status === 'paid')
@@ -143,13 +136,11 @@ const getTotal = (r: any): number => {
   return Number(r.amount)
 }
 
-// ── Line item / split helpers ─────────────────────────────────────────────────
 const addLineItem  = () => lineItems.value.push({ description: '', quantity: 1, unit_rate: 0 })
 const removeLineItem = (i: number) => { if (lineItems.value.length > 1) lineItems.value.splice(i, 1) }
 const addSplit     = () => paymentSplits.value.push({ label: 'Payment', percentage: 0, due_offset_days: 0 })
 const removeSplit  = (i: number) => { if (paymentSplits.value.length > 1) paymentSplits.value.splice(i, 1) }
 
-// ── Apply template ─────────────────────────────────────────────────────────────
 const applyTemplate = (template: any) => {
   form.value.currency    = template.default_currency
   form.value.notes       = template.default_notes || ''
@@ -179,7 +170,6 @@ const applyTemplate = (template: any) => {
   showToast(`Template "${template.name}" applied`)
 }
 
-// ── Fetch ─────────────────────────────────────────────────────────────────────
 const fetchData = async () => {
   loading.value = true
   fetchError.value = ''
@@ -204,7 +194,6 @@ const fetchData = async () => {
   }
 }
 
-// ── Create invoice ─────────────────────────────────────────────────────────────
 const createInvoice = async () => {
   if (!form.value.client_id) return showToast('Select a client', 'error')
   if (useLineItems.value && lineItems.value.every(i => !i.description.trim()))
@@ -299,7 +288,6 @@ const resetForm = () => {
   useLineItems.value      = true
 }
 
-// ── Update invoice status ─────────────────────────────────────────────────────
 const updateStatus = async (id: string, status: string) => {
   const idx = retainers.value.findIndex(r => r.id === id)
   if (idx === -1) return
@@ -321,7 +309,6 @@ const updateStatus = async (id: string, status: string) => {
   }
 }
 
-// ── Mark installment paid ─────────────────────────────────────────────────────
 const markInstallmentPaid = async (installment: any) => {
   try {
     const paidAt = new Date().toISOString()
@@ -343,7 +330,6 @@ const markInstallmentPaid = async (installment: any) => {
   }
 }
 
-// ── Delete invoice with confirmation modal ────────────────────────────────────
 const requestDeleteInvoice = (id: string) => {
   deletingInvoiceId.value = id
   showDeleteConfirm.value = true
@@ -375,7 +361,6 @@ onMounted(() => fetchData())
 
 <template>
   <div class="min-h-screen bg-base font-sans">
-    <!-- ===== Error Banner ===== -->
     <Transition name="banner">
       <div v-if="fetchError" class="mb-6 bg-red-500/5 border border-red-500/10 rounded-xl p-4 text-sm text-red-400 flex items-start gap-3">
         <UIcon name="i-heroicons-exclamation-circle" class="w-5 h-5 shrink-0 mt-0.5" />
@@ -387,7 +372,6 @@ onMounted(() => fetchData())
       </div>
     </Transition>
 
-    <!-- ===== Hero Header ===== -->
     <div class="relative mb-8 rounded-2xl bg-gradient-to-r from-primary/5 to-transparent border border-white/6 p-5 md:p-6">
       <div class="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div>
@@ -457,7 +441,6 @@ onMounted(() => fetchData())
       </div>
     </div>
 
-    <!-- Filters -->
     <div class="flex flex-col md:flex-row gap-3 mb-6">
       <div class="relative flex-1">
         <UIcon name="i-heroicons-magnifying-glass" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
@@ -468,7 +451,6 @@ onMounted(() => fetchData())
       </div>
     </div>
 
-    <!-- Table -->
     <div class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-left whitespace-nowrap min-w-[700px]">
@@ -553,18 +535,16 @@ onMounted(() => fetchData())
       </div>
     </div>
 
-    <!-- ── Templates Panel ────────────────────────────────────────────────────── -->
     <ModalBase :open="showTemplatePanel" title="Invoice Templates" @close="showTemplatePanel = false">
       <InvoiceTemplateManager @select="applyTemplate" />
     </ModalBase>
 
-    <!-- ── Invoice Detail Modal ───────────────────────────────────────────────── -->
     <ModalBase :open="showDetailModal && !!selectedInvoice" :title="selectedInvoice?.invoice_number || 'Invoice'" :subtitle="selectedInvoice?.title" @close="showDetailModal = false">
       <template v-if="selectedInvoice">
         <div class="space-y-6">
           <div class="flex items-center justify-between flex-wrap gap-4">
             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border" :class="statusConfig[effectiveStatus(selectedInvoice)]?.color">
-              <span class="w-1.5 h-1.5 rounded-full" :class="statusConfig[effectiveStatus(selectedInvoice)]?.dot" aria-hidden="true"></span>
+              <span class="w-1.5 h-1.5 rounded-full" :class="statusConfig[effectiveStatus(selectedInvoice)]?.dot" />
               {{ statusConfig[effectiveStatus(selectedInvoice)]?.label }}
             </span>
             <div v-if="selectedInvoice.status !== 'paid'" class="flex gap-2">
@@ -577,7 +557,113 @@ onMounted(() => fetchData())
             </p>
           </div>
 
-          <!-- ... (rest of detail content unchanged) ... -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-4">
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Client</p>
+              <p class="text-white font-semibold text-sm">{{ selectedInvoice.clients?.name }}</p>
+            </div>
+            <div v-if="selectedInvoice.projects?.name" class="bg-white/[0.03] border border-white/6 rounded-2xl p-4">
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Project</p>
+              <p class="text-white font-semibold text-sm">{{ selectedInvoice.projects.name }}</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3">
+            <div v-if="selectedInvoice.start_date" class="bg-white/[0.03] border border-white/6 rounded-2xl p-3">
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Issue</p>
+              <p class="text-white text-sm font-medium">{{ fmtDate(selectedInvoice.start_date) }}</p>
+            </div>
+            <div v-if="selectedInvoice.due_date" class="bg-white/[0.03] border border-white/6 rounded-2xl p-3">
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Due</p>
+              <p class="text-sm font-medium" :class="isOverdue(selectedInvoice) ? 'text-red-400' : 'text-white'">{{ fmtDate(selectedInvoice.due_date) }}</p>
+            </div>
+            <div v-if="selectedInvoice.end_date" class="bg-white/[0.03] border border-white/6 rounded-2xl p-3">
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Period End</p>
+              <p class="text-white text-sm font-medium">{{ fmtDate(selectedInvoice.end_date) }}</p>
+            </div>
+          </div>
+
+          <div v-if="selectedInvoice.payment_structure === 'recurring'" class="bg-primary/5 border border-primary/10 rounded-2xl p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Recurring Schedule</p>
+            <p class="text-white text-sm font-medium capitalize">
+              {{ selectedInvoice.recurring_interval }} · {{ selectedInvoice.recurring_cycles }} cycles
+            </p>
+          </div>
+
+          <div v-if="selectedInvoice.invoice_payment_schedule?.length">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-3">Payment Schedule</p>
+            <div class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden divide-y divide-white/5">
+              <div
+                v-for="installment in selectedInvoice.invoice_payment_schedule.sort((a: any, b: any) => a.position - b.position)"
+                :key="installment.id"
+                class="flex items-center justify-between p-4"
+              >
+                <div>
+                  <div class="flex items-center gap-2 mb-0.5">
+                    <div class="w-2 h-2 rounded-full" :class="installment.status === 'paid' ? 'bg-emerald-400' : 'bg-amber-400'"></div>
+                    <p class="text-white text-sm font-semibold">{{ installment.label }}</p>
+                  </div>
+                  <p class="text-slate-500 text-xs">
+                    {{ installment.percentage }}% ·
+                    <span v-if="installment.due_date">Due {{ fmtDate(installment.due_date) }}</span>
+                  </p>
+                  <p v-if="installment.paid_at" class="text-emerald-400 text-[10px] mt-0.5 font-medium">
+                    Paid {{ fmtDate(installment.paid_at.split('T')[0]) }}
+                  </p>
+                </div>
+                <div class="flex items-center gap-3">
+                  <p class="font-mono font-bold text-white tabular-nums">{{ fmt(installment.amount, selectedInvoice.currency) }}</p>
+                  <button
+                    v-if="installment.status !== 'paid'"
+                    @click="markInstallmentPaid(installment)"
+                    class="text-[10px] font-semibold bg-emerald-400/10 hover:bg-emerald-400/20 text-emerald-400 hover:text-white px-2.5 py-1.5 rounded-xl transition-all border border-emerald-400/20"
+                  >
+                    Mark Paid
+                  </button>
+                  <UIcon v-else name="i-heroicons-check-circle" class="w-5 h-5 text-emerald-400" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="selectedInvoice.invoice_items?.length">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-3">Line Items</p>
+            <div class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
+              <div class="grid grid-cols-12 gap-2 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-white/5">
+                <div class="col-span-6">Description</div>
+                <div class="col-span-2 text-right">Qty</div>
+                <div class="col-span-2 text-right">Rate</div>
+                <div class="col-span-2 text-right">Total</div>
+              </div>
+              <div v-for="item in selectedInvoice.invoice_items" :key="item.id" class="grid grid-cols-12 gap-2 px-4 py-3 text-sm border-b border-white/5 last:border-0">
+                <div class="col-span-6 text-slate-300">{{ item.description }}</div>
+                <div class="col-span-2 text-right text-slate-400 tabular-nums">{{ item.quantity }}</div>
+                <div class="col-span-2 text-right text-slate-400 font-mono tabular-nums">{{ fmt(item.unit_rate, selectedInvoice.currency) }}</div>
+                <div class="col-span-2 text-right text-white font-mono font-medium tabular-nums">{{ fmt(item.quantity * item.unit_rate, selectedInvoice.currency) }}</div>
+              </div>
+              <div class="grid grid-cols-12 gap-2 px-4 py-3 bg-white/5">
+                <div class="col-span-10 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider pr-4">Total</div>
+                <div class="col-span-2 text-right font-mono font-bold text-white text-base tabular-nums">{{ fmt(getTotal(selectedInvoice), selectedInvoice.currency) }}</div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="flex items-center justify-between bg-white/[0.03] border border-white/6 rounded-2xl p-4">
+            <p class="text-slate-400 font-medium text-sm">Amount</p>
+            <p class="text-white font-mono font-bold text-xl tabular-nums">{{ fmt(selectedInvoice.amount, selectedInvoice.currency) }}</p>
+          </div>
+
+          <div v-if="selectedInvoice.notes" class="bg-white/[0.03] border border-white/6 rounded-2xl p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Notes</p>
+            <p class="text-slate-300 text-sm leading-relaxed">{{ selectedInvoice.notes }}</p>
+          </div>
+
+          <div v-if="selectedInvoice.payment_link" class="flex items-center justify-between bg-primary/5 border border-primary/10 rounded-2xl p-4">
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">Payment Link</p>
+              <p class="text-primary text-xs truncate max-w-xs">{{ selectedInvoice.payment_link }}</p>
+            </div>
+            <a :href="selectedInvoice.payment_link" target="_blank" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-primary hover:bg-primary/90 text-white transition-all">Open</a>
+          </div>
         </div>
       </template>
       <template #footer>
@@ -588,23 +674,190 @@ onMounted(() => fetchData())
       </template>
     </ModalBase>
 
-    <!-- ── Create Invoice Modal ───────────────────────────────────────────────── -->
     <ModalBase :open="showCreateModal" title="Create Invoice" subtitle="Issue a new retainer or one‑time invoice" @close="showCreateModal = false; resetForm()">
       <form @submit.prevent="createInvoice" class="space-y-5">
-        <!-- ... (form content unchanged) ... -->
-      </form>
-      <template #footer>
-        <div class="flex gap-2.5">
-          <button @click="showCreateModal = false; resetForm()" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all">Cancel</button>
-          <button type="submit" form="create-invoice-form" :disabled="saving" class="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-primary/20 transition-all disabled:opacity-50" @click="createInvoice">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1.5">
+            <label class="block text-xs font-semibold text-slate-400">Client <span class="text-red-400">*</span></label>
+            <div class="relative">
+              <select v-model="form.client_id" required class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+                <option class="bg-[#0d1525] text-white" value="" disabled>Choose...</option>
+                <option class="bg-[#0d1525] text-white" v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
+              </select>
+              <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
+            </div>
+          </div>
+          <div v-if="clientProjects.length" class="space-y-1.5">
+            <label class="block text-xs font-semibold text-slate-400">Project</label>
+            <div class="relative">
+              <select v-model="form.project_id" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+                <option class="bg-[#0d1525] text-white" value="">None</option>
+                <option class="bg-[#0d1525] text-white" v-for="p in clientProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
+              </select>
+              <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-400">Title</label>
+          <input v-model="form.title" type="text" placeholder="e.g. Q2 2026 Monthly Retainer" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button type="button" @click="useLineItems = true" class="flex-1 py-2 rounded-lg text-xs font-semibold transition-all border" :class="useLineItems ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' : 'bg-white/5 text-slate-400 border-white/6 hover:border-white/10'">Line Items</button>
+          <button type="button" @click="useLineItems = false" class="flex-1 py-2 rounded-lg text-xs font-semibold transition-all border" :class="!useLineItems ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' : 'bg-white/5 text-slate-400 border-white/6 hover:border-white/10'">Flat Amount</button>
+        </div>
+
+        <div v-if="useLineItems" class="space-y-2">
+          <div class="grid grid-cols-12 gap-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 px-1">
+            <div class="col-span-6">Description</div>
+            <div class="col-span-2 text-center">Qty</div>
+            <div class="col-span-3 text-right">Rate</div>
+          </div>
+          <div v-for="(item, idx) in lineItems" :key="idx" class="grid grid-cols-12 gap-2 items-center">
+            <input v-model="item.description" type="text" placeholder="Description" class="col-span-6 bg-white/[0.04] border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
+            <input v-model.number="item.quantity" type="number" min="0.01" step="0.01" class="col-span-2 bg-white/[0.04] border border-white/8 rounded-xl px-2 py-2.5 text-sm text-white text-center focus:border-primary/50 focus:outline-none transition-all duration-150" />
+            <input v-model.number="item.unit_rate" type="number" min="0" step="0.01" class="col-span-3 bg-white/[0.04] border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white text-right focus:border-primary/50 focus:outline-none font-mono transition-all duration-150" />
+            <button type="button" @click="removeLineItem(idx)" :disabled="lineItems.length === 1" class="col-span-1 flex items-center justify-center text-slate-600 hover:text-red-400 transition-colors disabled:opacity-20">
+              <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
+            </button>
+          </div>
+          <button type="button" @click="addLineItem" class="text-xs font-semibold text-primary hover:text-white transition-colors flex items-center gap-1 mt-1">
+            <UIcon name="i-heroicons-plus" class="w-3.5 h-3.5" />Add line item
+          </button>
+          <div class="flex justify-between items-center pt-3 border-t border-white/5">
+            <p class="text-slate-400 text-sm font-medium">Total</p>
+            <p class="text-white font-mono font-bold text-lg tabular-nums">{{ fmt(lineItemsTotal, form.currency) }}</p>
+          </div>
+        </div>
+
+        <div v-else class="grid grid-cols-3 gap-3">
+          <div class="col-span-2 space-y-1.5">
+            <label class="block text-xs font-semibold text-slate-400">Amount</label>
+            <input v-model.number="form.amount" type="number" min="0" step="0.01" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none font-mono transition-all duration-150" />
+          </div>
+          <div class="space-y-1.5">
+            <label class="block text-xs font-semibold text-slate-400">Currency</label>
+            <div class="relative">
+              <select v-model="form.currency" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+                <option class="bg-[#0d1525] text-white" value="NGN">NGN</option>
+                <option class="bg-[#0d1525] text-white" value="USD">USD</option>
+                <option class="bg-[#0d1525] text-white" value="GBP">GBP</option>
+                <option class="bg-[#0d1525] text-white" value="EUR">EUR</option>
+              </select>
+              <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
+            </div>
+          </div>
+        </div>
+
+        <div v-if="useLineItems" class="w-32 space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-400">Currency</label>
+          <div class="relative">
+            <select v-model="form.currency" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+              <option class="bg-[#0d1525] text-white" value="NGN">NGN</option>
+              <option class="bg-[#0d1525] text-white" value="USD">USD</option>
+              <option class="bg-[#0d1525] text-white" value="GBP">GBP</option>
+              <option class="bg-[#0d1525] text-white" value="EUR">EUR</option>
+            </select>
+            <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
+          </div>
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-400">Payment Structure</label>
+          <div class="bg-white/5 p-1 rounded-xl grid grid-cols-3 gap-1">
+            <button type="button" v-for="s in ['one_time', 'split', 'recurring']" :key="s" @click="paymentStructure = s as any" class="py-2 rounded-lg text-xs font-semibold uppercase tracking-wide transition-all duration-150" :class="paymentStructure === s ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-400 hover:text-white hover:bg-white/5'">
+              {{ s === 'one_time' ? 'One-time' : s === 'split' ? 'Split' : 'Recurring' }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="paymentStructure === 'split'" class="space-y-3 bg-white/[0.03] rounded-2xl p-4 border border-white/6">
+          <div class="flex items-center justify-between">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Payment Splits</p>
+            <span class="text-[10px] font-semibold" :class="splitsTotal === 100 ? 'text-emerald-400' : 'text-amber-400'">{{ splitsTotal }}% / 100%</span>
+          </div>
+          <p class="text-[10px] text-slate-600">Amounts calculated from total. Due dates offset from issue date.</p>
+          <div v-for="(split, idx) in paymentSplits" :key="idx" class="grid grid-cols-12 gap-2 items-center">
+            <input v-model="split.label" type="text" placeholder="Label" class="col-span-4 bg-white/[0.04] border border-white/8 rounded-xl px-2.5 py-2 text-xs text-white focus:border-primary/50 focus:outline-none placeholder-slate-600 transition-all duration-150" />
+            <div class="col-span-3 relative">
+              <input v-model.number="split.percentage" type="number" min="1" max="100" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-2.5 py-2 text-xs text-white text-right focus:border-primary/50 focus:outline-none transition-all duration-150 pr-5" />
+              <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-[10px]">%</span>
+            </div>
+            <div class="col-span-4 relative">
+              <input v-model.number="split.due_offset_days" type="number" min="0" placeholder="+days" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-2.5 py-2 text-xs text-white focus:border-primary/50 focus:outline-none placeholder-slate-600 transition-all duration-150" />
+            </div>
+            <button type="button" @click="removeSplit(idx)" :disabled="paymentSplits.length === 1" class="col-span-1 flex items-center justify-center text-slate-600 hover:text-red-400 transition-colors disabled:opacity-20">
+              <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
+            </button>
+          </div>
+          <button type="button" @click="addSplit" class="text-xs font-semibold text-primary hover:text-white transition-colors flex items-center gap-1">
+            <UIcon name="i-heroicons-plus" class="w-3.5 h-3.5" />Add split
+          </button>
+          <div v-if="invoiceTotal > 0" class="border-t border-white/5 pt-3 space-y-1">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-600 mb-2">Preview</p>
+            <div v-for="(split, idx) in paymentSplits" :key="idx" class="flex justify-between text-xs text-slate-400">
+              <span>{{ split.label }}</span>
+              <span class="font-mono tabular-nums">{{ fmt(Math.round((split.percentage / 100) * invoiceTotal * 100) / 100, form.currency) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="paymentStructure === 'recurring'" class="grid grid-cols-2 gap-3">
+          <div class="space-y-1.5">
+            <label class="block text-xs font-semibold text-slate-400">Interval</label>
+            <div class="relative">
+              <select v-model="recurringInterval" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+                <option class="bg-[#0d1525] text-white" value="weekly">Weekly</option>
+                <option class="bg-[#0d1525] text-white" value="monthly">Monthly</option>
+                <option class="bg-[#0d1525] text-white" value="quarterly">Quarterly</option>
+                <option class="bg-[#0d1525] text-white" value="yearly">Yearly</option>
+              </select>
+              <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
+            </div>
+          </div>
+          <div class="space-y-1.5">
+            <label class="block text-xs font-semibold text-slate-400">Cycles</label>
+            <input v-model.number="recurringCycles" type="number" min="1" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <div class="space-y-1.5">
+            <label class="block text-xs font-semibold text-slate-400">Issue Date</label>
+            <input v-model="form.start_date" type="date" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-3 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
+          </div>
+          <div class="space-y-1.5">
+            <label class="block text-xs font-semibold text-slate-400">Due Date</label>
+            <input v-model="form.due_date" type="date" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-3 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
+          </div>
+          <div class="space-y-1.5">
+            <label class="block text-xs font-semibold text-slate-400">Period End</label>
+            <input v-model="form.end_date" type="date" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-3 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
+          </div>
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-400">Paystack / Payment Link</label>
+          <input v-model="form.payment_link" type="url" placeholder="https://paystack.com/pay/..." class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-400">Notes</label>
+          <textarea v-model="form.notes" rows="2" placeholder="Bank details, payment terms..." class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none transition-all duration-150"></textarea>
+        </div>
+
+        <div class="flex gap-3 pt-4 border-t border-white/5">
+          <button type="button" @click="showCreateModal = false; resetForm()" class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all duration-150">Cancel</button>
+          <button type="submit" :disabled="saving" class="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98]">
             <UIcon v-if="saving" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
-            <span v-else>Create Invoice</span>
+            {{ saving ? 'Creating...' : 'Create Invoice' }}
           </button>
         </div>
-      </template>
+      </form>
     </ModalBase>
 
-    <!-- ── Delete Confirmation Modal ──────────────────────────────────────────── -->
     <ModalBase :open="showDeleteConfirm" title="Delete Invoice" subtitle="This action cannot be undone." @close="showDeleteConfirm = false">
       <p class="text-slate-400 text-sm">Are you sure you want to permanently delete this invoice?</p>
       <template #footer>
@@ -618,7 +871,6 @@ onMounted(() => fetchData())
       </template>
     </ModalBase>
 
-    <!-- Toast -->
     <Transition enter-active-class="transform ease-out duration-300 transition" enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2" enter-to-class="translate-y-0 opacity-100 sm:translate-x-0" leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
       <div v-if="toast.show" class="fixed bottom-4 right-4 z-50">
         <div class="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl border" :class="toast.type === 'success' ? 'bg-[#0d1525] border-emerald-500/50' : 'bg-[#0d1525] border-red-500/50'">

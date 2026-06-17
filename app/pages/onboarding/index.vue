@@ -333,8 +333,8 @@ onMounted(async () => {
           <label class="block text-xs font-semibold text-slate-400">Client <span class="text-red-400">*</span></label>
           <div class="relative">
             <select v-model="newForm.client_id" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
-              <option value="" disabled>Select a client…</option>
-              <option v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
+              <option class="bg-[#0d1525] text-white" value="" disabled>Select a client…</option>
+              <option class="bg-[#0d1525] text-white" v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
             <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
           </div>
@@ -355,8 +355,8 @@ onMounted(async () => {
           <label class="block text-xs font-semibold text-slate-400">Link to a project <span class="text-slate-500 font-normal ml-1">— optional</span></label>
           <div class="relative">
             <select v-model="newForm.project_id" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
-              <option value="">No project — assign later</option>
-              <option v-for="p in clientProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
+              <option class="bg-[#0d1525] text-white" value="">No project — assign later</option>
+              <option class="bg-[#0d1525] text-white" v-for="p in clientProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
             </select>
             <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
           </div>
@@ -380,8 +380,8 @@ onMounted(async () => {
           <div v-if="showCopySection" class="px-4 pb-4 border-t border-white/5 pt-4">
             <div class="relative">
               <select v-model="copyFromFormId" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
-                <option value="">Pick a form to copy from…</option>
-                <option v-for="f in forms" :key="f.id" :value="f.id">{{ f.title }} — {{ f.clients?.name || 'No client' }}</option>
+                <option class="bg-[#0d1525] text-white" value="">Pick a form to copy from…</option>
+                <option class="bg-[#0d1525] text-white" v-for="f in forms" :key="f.id" :value="f.id">{{ f.title }} — {{ f.clients?.name || 'No client' }}</option>
               </select>
               <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
             </div>

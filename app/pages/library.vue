@@ -514,8 +514,8 @@ onMounted(() => fetchData())
             <label class="block text-xs font-semibold text-slate-400">Link to Project</label>
             <div class="relative">
               <select v-model="form.project_id" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer">
-                <option value="">None</option>
-                <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
+                <option class="bg-[#0d1525] text-white" value="">None</option>
+                <option class="bg-[#0d1525] text-white" v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
               </select>
               <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
             </div>
@@ -524,8 +524,8 @@ onMounted(() => fetchData())
             <label class="block text-xs font-semibold text-slate-400">Link to Client</label>
             <div class="relative">
               <select v-model="form.client_id" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer">
-                <option value="">None</option>
-                <option v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
+                <option class="bg-[#0d1525] text-white" value="">None</option>
+                <option class="bg-[#0d1525] text-white" v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
               </select>
               <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
             </div>
