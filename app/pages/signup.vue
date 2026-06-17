@@ -25,6 +25,17 @@ const form = ref({
   avatar_url: null as string | null
 })
 
+// Brand colour
+const brandColor = ref('#4d48e5')  // default
+
+const brandThemes = [
+  { name: 'Ops Indigo',   hex: '#4d48e5' },
+  { name: 'Cyber Blue',   hex: '#0ea5e9' },
+  { name: 'Emerald',      hex: '#10b981' },
+  { name: 'Orange Alert', hex: '#f97316' },
+  { name: 'Crimson',      hex: '#ef4444' },
+]
+
 // ── Avatar ────────────────────────────────────────────────────────────────────
 const avatarPreview = ref<string | null>(null)
 const avatarUploading = ref(false)
@@ -52,6 +63,9 @@ const step2Valid = computed(() =>
   form.value.role.length > 0 &&
   form.value.phone.length >= 6
 )
+
+// brand step always valid (a colour is pre‑selected)
+const step3Valid = computed(() => true)
 
 // ── Field‑level error helpers ─────────────────────────────────────────────────
 const emailError = computed(() => {
@@ -104,7 +118,7 @@ const handleAvatarUpload = async (file: File) => {
     avatarPreview.value = data.secure_url
   } catch (e: any) {
     errorMsg.value = e.message || 'Could not upload image. Please try another or skip.'
-    avatarPreview.value = null   // reset preview if upload fails
+    avatarPreview.value = null
   } finally {
     avatarUploading.value = false
   }
@@ -114,7 +128,6 @@ const handleFileSelect = async (e: Event) => {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
 
-  // Validate file
   if (file.size > 5 * 1024 * 1024) {
     errorMsg.value = 'Image must be smaller than 5MB.'
     return
@@ -124,7 +137,6 @@ const handleFileSelect = async (e: Event) => {
     return
   }
 
-  // Show local preview immediately
   avatarPreview.value = URL.createObjectURL(file)
   await handleAvatarUpload(file)
 }
@@ -139,7 +151,7 @@ const skipAvatar = () => {
   form.value.avatar_url = null
   avatarPreview.value = null
   errorMsg.value = ''
-  handleSignup()   // proceed directly to signup without avatar
+  handleSignup()
 }
 
 // ── Step navigation ───────────────────────────────────────────────────────────
@@ -149,14 +161,24 @@ const nextStep = () => {
   step.value = 2
 }
 
-const nextToAvatar = () => {
+const nextToBrand = () => {
   errorMsg.value = ''
   if (!step2Valid.value) return
   step.value = 3
 }
 
+const nextToAvatar = () => {
+  errorMsg.value = ''
+  // step 3 always valid
+  step.value = 4
+}
+
 const backToProfile = () => {
   step.value = 2
+}
+
+const backToBrand = () => {
+  step.value = 3
 }
 
 // ── Signup ────────────────────────────────────────────────────────────────────
@@ -182,20 +204,20 @@ const handleSignup = async () => {
 
     if (error) throw error
 
-    // Persist avatar to profiles table as fallback
-    if (form.value.avatar_url && data.user) {
+    // Persist avatar + brand colour to profiles table
+    if (data.user) {
       try {
         await client
           .from('profiles')
           .update({
             avatar_url: form.value.avatar_url,
+            preferences: { brand_color: brandColor.value },
             updated_at: new Date().toISOString()
           })
           .eq('id', data.user.id)
       } catch (_) { /* ignore – trigger may handle it */ }
     }
 
-    // Show success & redirect
     successMsg.value = 'Account created! Check your email to verify, then sign in.'
     setTimeout(() => navigateTo('/login'), 2500)
   } catch (e: any) {
@@ -210,30 +232,34 @@ const handleSignup = async () => {
   <div class="w-full max-w-lg mx-auto space-y-6">
     <!-- Heading -->
     <div class="text-center">
-      <h1 class="text-2xl font-bold text-white">Create your account</h1>
-      <p class="text-sm text-slate-400 mt-1">Step {{ step }} of 3</p>
+      <h1 class="text-2xl font-bold text-white">{{ step === 1 ? 'Create your account' : step === 2 ? 'Tell us about yourself' : step === 3 ? 'Choose your brand colour' : 'Your avatar' }}</h1>
+      <p class="text-sm text-slate-400 mt-1">Step {{ step }} of 4</p>
     </div>
 
     <!-- Step indicators -->
     <div class="flex justify-center gap-2">
-      <div class="h-1.5 w-12 rounded-full transition-colors duration-300"
+      <div class="h-1.5 w-8 rounded-full transition-colors duration-300"
            :class="step >= 1 ? 'bg-primary' : 'bg-white/10'"></div>
-      <div class="h-1.5 w-12 rounded-full transition-colors duration-300"
+      <div class="h-1.5 w-8 rounded-full transition-colors duration-300"
            :class="step >= 2 ? 'bg-primary' : 'bg-white/10'"></div>
-      <div class="h-1.5 w-12 rounded-full transition-colors duration-300"
+      <div class="h-1.5 w-8 rounded-full transition-colors duration-300"
            :class="step >= 3 ? 'bg-primary' : 'bg-white/10'"></div>
+      <div class="h-1.5 w-8 rounded-full transition-colors duration-300"
+           :class="step >= 4 ? 'bg-primary' : 'bg-white/10'"></div>
     </div>
 
     <!-- Form card -->
     <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-6 md:p-8">
       <form @submit.prevent="
-        step === 1 ? nextStep() : 
-        step === 2 ? nextToAvatar() : 
+        step === 1 ? nextStep() :
+        step === 2 ? nextToBrand() :
+        step === 3 ? nextToAvatar() :
         handleSignup()
       " class="space-y-5">
 
         <!-- ── STEP 1: Credentials ────────────────────────────────────────── -->
         <div v-if="step === 1" class="space-y-4">
+          <p class="text-sm text-slate-400">Start by securing your account with a strong password.</p>
           <div class="space-y-1.5">
             <label for="signup-email" class="text-xs font-semibold text-slate-400">Email</label>
             <input
@@ -303,6 +329,7 @@ const handleSignup = async () => {
 
         <!-- ── STEP 2: Profile ────────────────────────────────────────────── -->
         <div v-if="step === 2" class="space-y-4">
+          <p class="text-sm text-slate-400">Let’s set up your professional identity.</p>
           <div class="space-y-1.5">
             <label for="signup-name" class="text-xs font-semibold text-slate-400">Full Name</label>
             <input
@@ -368,14 +395,53 @@ const handleSignup = async () => {
               :disabled="!step2Valid"
               class="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98]"
             >
-              Choose Avatar
+              Choose Brand Colour
               <UIcon name="i-heroicons-arrow-right" class="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        <!-- ── STEP 3: Avatar ─────────────────────────────────────────────── -->
-        <div v-if="step === 3" class="space-y-5">
+        <!-- ── STEP 3: Brand Colour ───────────────────────────────────────── -->
+        <div v-if="step === 3" class="space-y-4">
+          <p class="text-sm text-slate-400">Pick an accent colour for your dashboard and client forms.</p>
+          <div class="grid grid-cols-5 gap-3">
+            <button
+              v-for="t in brandThemes"
+              :key="t.hex"
+              type="button"
+              @click="brandColor = t.hex"
+              class="flex flex-col items-center gap-2 p-3 rounded-xl border transition-all"
+              :class="brandColor === t.hex
+                ? 'bg-white/5 border-primary shadow-lg shadow-primary/10 scale-105'
+                : 'bg-white/3 border-white/6 hover:border-white/10'"
+            >
+              <div
+                class="w-10 h-10 rounded-full shadow-md"
+                :style="{ backgroundColor: t.hex }"
+              ></div>
+              <span class="text-[10px] font-semibold" :class="brandColor === t.hex ? 'text-white' : 'text-slate-500'">{{ t.name }}</span>
+            </button>
+          </div>
+          <div class="flex gap-3 pt-2">
+            <button
+              type="button"
+              @click="backToProfile"
+              class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all"
+            >
+              Back
+            </button>
+            <button
+              type="submit"
+              class="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98]"
+            >
+              Continue to Avatar
+              <UIcon name="i-heroicons-arrow-right" class="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <!-- ── STEP 4: Avatar ─────────────────────────────────────────────── -->
+        <div v-if="step === 4" class="space-y-5">
           <!-- Preview -->
           <div class="flex justify-center">
             <div class="w-24 h-24 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center overflow-hidden">
@@ -440,7 +506,7 @@ const handleSignup = async () => {
           <div class="flex gap-3 pt-2">
             <button
               type="button"
-              @click="backToProfile"
+              @click="backToBrand"
               class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all"
             >
               Back

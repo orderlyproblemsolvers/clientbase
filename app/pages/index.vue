@@ -59,12 +59,13 @@ const fetchDashboard = async () => {
       .from('projects').select('*', { count: 'exact', head: true }).eq('status', 'active')
     stats.value.activeProjects = projCount || 0
 
+    // ✅ Now fetching BOTH pending and overdue invoices
     const { data: invoiceData } = await supabase
       .from('retainers')
       .select('id, title, amount, currency, status, due_date, invoice_number, clients(id, name), invoice_items(*)')
-      .in('status', ['pending'])
+      .in('status', ['pending', 'overdue'])   // <-- changed: includes overdue
       .order('due_date', { ascending: true })
-    const allPending = invoiceData || []
+    const unpaid = invoiceData || []
 
     const getTotal = (r: any) => {
       if (r.invoice_items?.length)
@@ -72,14 +73,19 @@ const fetchDashboard = async () => {
       return Number(r.amount)
     }
 
-    stats.value.outstandingNGN = allPending
+    // Outstanding NGN = sum of all unpaid (pending + overdue) in NGN
+    stats.value.outstandingNGN = unpaid
       .filter(r => r.currency === 'NGN')
       .reduce((s, r) => s + getTotal(r), 0)
 
-    overdueInvoices.value = allPending
-      .filter(r => r.due_date && r.due_date < todayStr).slice(0, 5)
-    stats.value.overdueCount = overdueInvoices.value.length
+    // Overdue list – includes DB‑marked overdue OR pending with due date past
+    const overdue = unpaid.filter(r =>
+      r.status === 'overdue' || (r.status === 'pending' && r.due_date && r.due_date < todayStr)
+    )
+    overdueInvoices.value = overdue.slice(0, 5)
+    stats.value.overdueCount = overdue.length
 
+    // Recent invoices (unchanged – still shows latest 5 regardless of status)
     const { data: recentInv } = await supabase
       .from('retainers')
       .select('id, title, amount, currency, status, due_date, invoice_number, clients(id, name), invoice_items(*)')
@@ -291,9 +297,8 @@ onMounted(() => fetchDashboard())
 
         <!-- ===== Main Content: Milestones, Overdue/Tasks, Invoices ===== -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <!-- Left: Milestones (full width of left 2 cols) + Overdue/Tasks -->
           <div class="lg:col-span-2 space-y-6">
-            <!-- Upcoming Milestones (prominent) -->
+            <!-- Upcoming Milestones -->
             <div v-if="upcomingMilestones.length" class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
               <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
                 <div class="flex items-center gap-2">
@@ -323,7 +328,7 @@ onMounted(() => fetchDashboard())
               </div>
             </div>
 
-            <!-- Overdue Invoices + Tasks Due Today (side by side) -->
+            <!-- Overdue Invoices + Tasks Due Today -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <!-- Overdue Invoices -->
               <div v-if="overdueInvoices.length" class="bg-red-500/5 border border-red-500/10 rounded-2xl p-4">
@@ -417,7 +422,7 @@ onMounted(() => fetchDashboard())
           </div>
         </div>
 
-        <!-- ===== Clients Table (full width) ===== -->
+        <!-- ===== Clients Table ===== -->
         <section v-if="clients.length" class="mb-8">
           <div class="flex items-center justify-between mb-4">
             <div>
@@ -428,14 +433,12 @@ onMounted(() => fetchDashboard())
             </div>
           </div>
 
-          <!-- Empty search state -->
           <div v-if="filteredClients.length === 0" class="border border-dashed border-white/8 rounded-2xl py-16 text-center">
             <UIcon name="i-heroicons-magnifying-glass" class="w-10 h-10 text-slate-600 mx-auto mb-3" />
             <p class="text-base font-semibold text-white mb-1">No matching clients</p>
             <p class="text-sm text-slate-500">Try a different search term.</p>
           </div>
 
-          <!-- Clients Table (responsive scroll) -->
           <div v-else class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
             <div class="overflow-x-auto">
               <table class="w-full text-left whitespace-nowrap min-w-[600px]">
@@ -451,30 +454,25 @@ onMounted(() => fetchDashboard())
                 </thead>
                 <tbody class="divide-y divide-white/5">
                   <tr v-for="c in filteredClients" :key="c.id" class="hover:bg-white/[0.03] transition-colors group">
-                    <!-- Logo -->
                     <td class="px-4 sm:px-5 py-4">
                       <div class="w-9 h-9 rounded-xl bg-primary/10 border border-primary/10 flex items-center justify-center overflow-hidden">
                         <img v-if="c.logo_url" :src="c.logo_url" :alt="c.name" class="w-full h-full object-cover" />
                         <span v-else class="text-primary font-bold text-xs">{{ getInitials(c.name) }}</span>
                       </div>
                     </td>
-                    <!-- Name -->
                     <td class="px-4 sm:px-5 py-4">
                       <NuxtLink :to="`/clients/${c.id}`" class="text-sm font-semibold text-white group-hover:text-primary transition-colors truncate block max-w-[180px]">{{ c.name }}</NuxtLink>
                     </td>
-                    <!-- Category (hidden on small screens) -->
                     <td class="px-4 sm:px-5 py-4 hidden sm:table-cell">
                       <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border" :class="getCategoryColor(c.category)">
                         <UIcon :name="getCategoryIcon(c.category)" class="w-3 h-3" />
                         {{ c.category || 'Dev' }}
                       </span>
                     </td>
-                    <!-- Website (hidden on medium) -->
                     <td class="px-4 sm:px-5 py-4 hidden md:table-cell">
                       <a v-if="c.website" :href="c.website" target="_blank" class="text-xs text-slate-400 hover:text-primary transition-colors truncate block max-w-[180px]">{{ c.website.replace(/^https?:\/\//, '') }}</a>
                       <span v-else class="text-xs text-slate-600">—</span>
                     </td>
-                    <!-- Contact (hidden on medium) -->
                     <td class="px-4 sm:px-5 py-4 hidden md:table-cell">
                       <div class="flex flex-col text-xs text-slate-400 gap-0.5">
                         <span v-if="c.contact_email" class="truncate max-w-[160px]">{{ c.contact_email }}</span>
@@ -482,7 +480,6 @@ onMounted(() => fetchDashboard())
                         <span v-if="!c.contact_email && !c.contact_phone" class="text-slate-600">—</span>
                       </div>
                     </td>
-                    <!-- Actions -->
                     <td class="px-4 sm:px-5 py-4 text-right">
                       <NuxtLink :to="`/clients/${c.id}`" class="text-xs font-semibold text-primary hover:text-white transition-colors">View →</NuxtLink>
                     </td>
@@ -505,7 +502,6 @@ onMounted(() => fetchDashboard())
 </template>
 
 <style scoped>
-/* Content fade transition */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease;
@@ -515,7 +511,6 @@ onMounted(() => fetchDashboard())
   opacity: 0;
 }
 
-/* Error banner transition */
 .banner-enter-active,
 .banner-leave-active {
   transition: opacity 0.25s ease, transform 0.25s ease;

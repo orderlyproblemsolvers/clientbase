@@ -11,6 +11,7 @@ const projectId = computed(() => {
 })
 
 const loading     = ref(true)
+const fetchError  = ref('')
 const activeTab   = ref('secrets')
 const projectData = ref(null)
 const clientData  = ref(null)
@@ -28,11 +29,13 @@ const editForm = ref({
 })
 
 const showSecretModal = ref(false)
+const savingSecret = ref(false)
 const newSecret = ref({ name: '', value: '' })
 
 const isEditingNotes = ref(false)
 const notesDraft     = ref('')
 const isPreviewMode  = ref(false)
+const savingNotes = ref(false)
 
 const briefSubmission = ref(null)
 const briefForm       = ref(null)
@@ -49,6 +52,7 @@ const loadingLogs = ref(false)
 const testEmailSending = ref(false)
 const testEmailResult = ref('')
 
+// Toast
 const toast = ref({ show: false, message: '', type: 'success' })
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -60,6 +64,12 @@ const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
 const shareToken = ref<string | null>(null)
 const generatingShareLink = ref(false)
 const copiedShareLink = ref(false)
+
+// Delete confirmation modals
+const showDeleteProjectConfirm = ref(false)
+const showDeleteSecretConfirm = ref(false)
+const deletingSecretId = ref<string | null>(null)
+const showRevokeShareConfirm = ref(false)
 
 const generateShareLink = async () => {
   if (shareToken.value) return
@@ -76,8 +86,9 @@ const generateShareLink = async () => {
       projectData.value.share_token = token
     }
     shareToken.value = token
+    showToast('Share link generated!', 'success')
   } catch (e: any) {
-    alert(e.message)
+    showToast(e.message, 'error')
   } finally {
     generatingShareLink.value = false
   }
@@ -92,7 +103,6 @@ const copyShareLink = () => {
 }
 
 const revokeShareLink = async () => {
-  if (!confirm('Revoke the current share link? The old link will stop working.')) return
   try {
     const { error } = await supabase
       .from('projects')
@@ -101,20 +111,24 @@ const revokeShareLink = async () => {
     if (error) throw error
     projectData.value.share_token = null
     shareToken.value = null
+    showRevokeShareConfirm.value = false
+    showToast('Share link revoked', 'success')
   } catch (e: any) {
-    alert(e.message)
+    showToast(e.message, 'error')
   }
 }
 
 const fetchData = async () => {
   if (!projectId.value) { loading.value = false; return }
   loading.value = true
+  fetchError.value = ''
   try {
-    const { data: pData } = await supabase
+    const { data: pData, error: projError } = await supabase
       .from('projects')
       .select('*, clients(id, name, category, website)')
       .eq('id', projectId.value)
       .single()
+    if (projError) throw projError
     projectData.value = pData
     clientData.value  = pData?.clients
     notesDraft.value  = pData?.notes || ''
@@ -143,7 +157,12 @@ const fetchData = async () => {
       briefSubmission.value = subData
       briefForm.value       = subData?.onboarding_forms
     }
-  } catch (e) { console.error(e) } finally { loading.value = false }
+  } catch (e: any) {
+    console.error(e)
+    fetchError.value = e.message || 'Failed to load project data.'
+  } finally {
+    loading.value = false
+  }
 }
 
 const saveEdit = async () => {
@@ -162,24 +181,42 @@ const saveEdit = async () => {
     }).eq('id', projectId.value)
     if (error) throw error
     showEditModal.value = false
+    showToast('Project updated successfully')
     await fetchData()
-  } catch (e) { alert('Error saving: ' + e.message) } finally { savingEdit.value = false }
+  } catch (e: any) {
+    showToast(e.message, 'error')
+  } finally {
+    savingEdit.value = false
+  }
 }
 
 const saveNotes = async () => {
   if (!projectId.value) return
+  savingNotes.value = true
   try {
-    const { error } = await supabase.from('projects').update({ notes: notesDraft.value, updated_at: new Date().toISOString() }).eq('id', projectId.value)
+    const { error } = await supabase.from('projects').update({
+      notes: notesDraft.value,
+      updated_at: new Date().toISOString()
+    }).eq('id', projectId.value)
     if (error) throw error
     projectData.value.notes = notesDraft.value
     isEditingNotes.value = false
     isPreviewMode.value  = false
-  } catch (e) { alert('Save failed: ' + e.message) }
+    showToast('Notes saved')
+  } catch (e: any) {
+    showToast(e.message, 'error')
+  } finally {
+    savingNotes.value = false
+  }
 }
 
 const addSecret = async () => {
-  if (!projectId.value) { alert('Project ID missing'); return }
-  if (!newSecret.value.name || !newSecret.value.value) return
+  if (!projectId.value) return
+  if (!newSecret.value.name || !newSecret.value.value) {
+    showToast('Both key name and value are required', 'error')
+    return
+  }
+  savingSecret.value = true
   try {
     await $fetch('/api/secrets', {
       method: 'POST',
@@ -187,14 +224,31 @@ const addSecret = async () => {
     })
     showSecretModal.value = false
     newSecret.value = { name: '', value: '' }
+    showToast('Secret added')
     await fetchData()
-  } catch (e) { alert(e.message || 'Error saving secret') }
+  } catch (e: any) {
+    showToast(e.message || 'Error saving secret', 'error')
+  } finally {
+    savingSecret.value = false
+  }
 }
 
-const deleteSecret = async (id) => {
-  if (!confirm('Delete this secret?')) return
-  await $fetch('/api/secrets', { method: 'DELETE', query: { id } })
-  await fetchData()
+const requestDeleteSecret = (id: string) => {
+  deletingSecretId.value = id
+  showDeleteSecretConfirm.value = true
+}
+
+const confirmDeleteSecret = async () => {
+  if (!deletingSecretId.value) return
+  try {
+    await $fetch('/api/secrets', { method: 'DELETE', query: { id: deletingSecretId.value } })
+    showToast('Secret deleted')
+    showDeleteSecretConfirm.value = false
+    deletingSecretId.value = null
+    await fetchData()
+  } catch (e: any) {
+    showToast(e.message, 'error')
+  }
 }
 
 const copyToClipboard = (text, id) => {
@@ -218,8 +272,13 @@ const handleFileUpload = async (event) => {
       project_id: projectId.value, file_name: file.name, file_path: filePath, file_type: file.type, client_id: clientData.value?.id || null,
     })
     if (dbError) throw dbError
+    showToast('File uploaded')
     await fetchData()
-  } catch (e) { alert(e.message) } finally { uploading.value = false }
+  } catch (e: any) {
+    showToast(e.message, 'error')
+  } finally {
+    uploading.value = false
+  }
 }
 
 const downloadFile = async (path) => {
@@ -229,7 +288,6 @@ const downloadFile = async (path) => {
 
 const deleteProject = async () => {
   if (!projectId.value) return
-  if (!confirm('Permanently delete this project and all its data?')) return
   isDeleting.value = true
   try {
     const { data: filesToDelete } = await supabase.from('files').select('file_path').eq('project_id', projectId.value)
@@ -237,13 +295,22 @@ const deleteProject = async () => {
       await supabase.storage.from('project_files').remove(filesToDelete.map((f) => f.file_path))
     }
     await supabase.from('projects').delete().eq('id', projectId.value)
+    showDeleteProjectConfirm.value = false
     return navigateTo(clientData.value ? `/clients/${clientData.value.id}` : '/')
-  } catch (e) { alert('Error: ' + e.message) } finally { isDeleting.value = false }
+  } catch (e: any) {
+    showToast(e.message, 'error')
+  } finally {
+    isDeleting.value = false
+  }
 }
 
 const fetchReminderConfig = async () => {
-  const { data } = await supabase.from('invoice_reminder_configs').select('*').eq('project_id', projectId.value).single()
-  if (data) reminderConfig.value = data
+  try {
+    const { data } = await supabase.from('invoice_reminder_configs').select('*').eq('project_id', projectId.value).single()
+    if (data) reminderConfig.value = data
+  } catch (e: any) {
+    showToast('Failed to load reminder config', 'error')
+  }
 }
 
 const saveReminderConfig = async () => {
@@ -259,24 +326,38 @@ const saveReminderConfig = async () => {
     }, { onConflict: 'project_id' })
     if (error) throw error
     showToast('Reminder settings saved!')
-  } catch (e: any) { showToast(e.message, 'error') } finally { savingReminder.value = false }
+  } catch (e: any) {
+    showToast(e.message, 'error')
+  } finally {
+    savingReminder.value = false
+  }
 }
 
 const fetchReminderLogs = async () => {
   loadingLogs.value = true
-  const { data } = await supabase.from('invoice_reminder_logs').select('*').eq('project_id', projectId.value).order('sent_at', { ascending: false }).limit(20)
-  reminderLogs.value = data || []
-  loadingLogs.value = false
+  try {
+    const { data } = await supabase.from('invoice_reminder_logs').select('*').eq('project_id', projectId.value).order('sent_at', { ascending: false }).limit(20)
+    reminderLogs.value = data || []
+  } catch (e: any) {
+    showToast('Failed to load reminder logs', 'error')
+  } finally {
+    loadingLogs.value = false
+  }
 }
 
 const sendTestEmail = async () => {
-  testEmailSending.value = true; testEmailResult.value = ''
+  testEmailSending.value = true
+  testEmailResult.value = ''
   try {
     await $fetch('/api/send-test-reminder', { method: 'POST', body: { project_id: projectId.value, recipient_email: reminderConfig.value.recipient_email } })
     testEmailResult.value = 'sent'
     showToast('Test email sent! Check your inbox.')
-  } catch (e: any) { testEmailResult.value = 'failed'; showToast(e.message || 'Failed to send test email', 'error') }
-  finally { testEmailSending.value = false }
+  } catch (e: any) {
+    testEmailResult.value = 'failed'
+    showToast(e.message || 'Failed to send test email', 'error')
+  } finally {
+    testEmailSending.value = false
+  }
 }
 
 const statusConfig: Record<string, { label: string; dot: string; badge: string }> = {
@@ -335,7 +416,7 @@ onMounted(() => fetchData())
 <template>
   <div class="min-h-screen bg-base font-sans">
 
-    <!-- Breadcrumb (wrapping) -->
+    <!-- Breadcrumb -->
     <nav class="flex flex-wrap items-center gap-1.5 text-sm text-slate-500 mb-6" aria-label="Breadcrumb">
       <NuxtLink to="/" class="flex items-center gap-1.5 hover:text-slate-300 transition-colors duration-150">
         <UIcon name="i-heroicons-squares-2x2" class="w-4 h-4" />
@@ -369,10 +450,17 @@ onMounted(() => fetchData())
       <div class="h-64 bg-white/5 animate-pulse rounded-2xl"></div>
     </div>
 
+    <!-- Global Fetch Error -->
+    <div v-else-if="fetchError && !projectData" class="flex flex-col items-center py-20 text-center">
+      <UIcon name="i-heroicons-exclamation-triangle" class="w-10 h-10 text-red-400 mb-4" />
+      <p class="text-white font-semibold mb-2">Failed to load project</p>
+      <p class="text-slate-400 text-sm mb-4">{{ fetchError }}</p>
+      <button @click="fetchData" class="px-4 py-2 bg-primary text-white rounded-xl text-sm font-semibold hover:bg-primary/90">Retry</button>
+    </div>
+
     <div v-else-if="projectData" class="space-y-8">
 
-      <!-- ===== Hero Header ===== -->
-      <!-- Mobile layout (visible < lg) -->
+      <!-- Hero Header (mobile) -->
       <div class="lg:hidden rounded-2xl bg-gradient-to-br from-white/[0.04] via-white/[0.02] to-transparent border border-white/6 p-5 space-y-5">
         <div class="flex items-center gap-4">
           <div class="w-14 h-14 rounded-2xl bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
@@ -395,7 +483,7 @@ onMounted(() => fetchData())
         <p v-if="projectData.description" class="text-sm text-slate-400 leading-relaxed">{{ projectData.description }}</p>
         <div class="flex items-center gap-2 flex-wrap">
           <button v-if="!shareToken" @click="generateShareLink" :disabled="generatingShareLink"
-                  class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all active:scale-[0.98]">
+                  class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all active:scale-[0.98] disabled:opacity-50">
             <UIcon v-if="generatingShareLink" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
             <UIcon v-else name="i-heroicons-share" class="w-4 h-4" /> Share with Client
           </button>
@@ -403,7 +491,7 @@ onMounted(() => fetchData())
             <button @click="copyShareLink" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary/10 border border-primary/20 active:scale-[0.98]">
               <UIcon :name="copiedShareLink ? 'i-heroicons-check' : 'i-heroicons-link'" class="w-4 h-4" /> {{ copiedShareLink ? 'Copied!' : 'Copy Link' }}
             </button>
-            <button @click="revokeShareLink" class="p-2.5 rounded-xl text-slate-400 hover:text-red-400 bg-white/5 border border-white/6">
+            <button @click="showRevokeShareConfirm = true" class="p-2.5 rounded-xl text-slate-400 hover:text-red-400 bg-white/5 border border-white/6">
               <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
             </button>
           </template>
@@ -411,7 +499,6 @@ onMounted(() => fetchData())
             <UIcon name="i-heroicons-pencil-square" class="w-4 h-4" /> Edit
           </button>
         </div>
-        <!-- Meta Cards -->
         <div class="grid grid-cols-2 gap-3 pt-4 border-t border-white/5">
           <div class="flex items-center gap-2"><UIcon name="i-heroicons-calendar-days" class="w-4 h-4 text-slate-400" /><div><p class="text-[10px] text-slate-500">Start</p><p class="text-sm text-white">{{ projectData.start_date ? new Date(projectData.start_date).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }) : '—' }}</p></div></div>
           <div class="flex items-center gap-2"><UIcon name="i-heroicons-calendar-days" class="w-4 h-4 text-slate-400" /><div><p class="text-[10px] text-slate-500">End</p><p class="text-sm text-white">{{ projectData.end_date ? new Date(projectData.end_date).toLocaleDateString() : '—' }}</p></div></div>
@@ -420,7 +507,7 @@ onMounted(() => fetchData())
         </div>
       </div>
 
-      <!-- Desktop layout (hidden < lg) -->
+      <!-- Hero Header (desktop) -->
       <div class="hidden lg:block relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/[0.04] via-white/[0.02] to-transparent border border-white/6 p-6 md:p-8">
         <div class="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none"></div>
         <div class="relative z-10 flex flex-col lg:flex-row lg:items-start justify-between gap-6">
@@ -444,14 +531,14 @@ onMounted(() => fetchData())
             </div>
           </div>
           <div class="flex items-center gap-2 shrink-0 lg:self-start">
-            <button v-if="!shareToken" @click="generateShareLink" :disabled="generatingShareLink" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all active:scale-[0.98]">
+            <button v-if="!shareToken" @click="generateShareLink" :disabled="generatingShareLink" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all active:scale-[0.98] disabled:opacity-50">
               <UIcon v-if="generatingShareLink" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" /> <UIcon v-else name="i-heroicons-share" class="w-4 h-4" /> <span class="hidden sm:inline">Share with Client</span>
             </button>
             <template v-else>
               <button @click="copyShareLink" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary/10 hover:bg-primary/20 border border-primary/20 transition-all active:scale-[0.98]">
                 <UIcon :name="copiedShareLink ? 'i-heroicons-check' : 'i-heroicons-link'" class="w-4 h-4" /> <span class="hidden sm:inline">{{ copiedShareLink ? 'Copied!' : 'Copy Client Link' }}</span>
               </button>
-              <button @click="revokeShareLink" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-red-400 bg-white/5 border border-white/6 transition-all">
+              <button @click="showRevokeShareConfirm = true" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-red-400 bg-white/5 border border-white/6 transition-all">
                 <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
               </button>
             </template>
@@ -468,7 +555,7 @@ onMounted(() => fetchData())
         </div>
       </div>
 
-      <!-- ===== Tabs (priority + overflow) ===== -->
+      <!-- Tabs -->
       <div class="flex items-center gap-1">
         <div class="flex items-center gap-1 overflow-hidden">
           <button
@@ -503,606 +590,446 @@ onMounted(() => fetchData())
         </div>
       </div>
 
-      <!-- ===== Tab Content (unchanged) ===== -->
+      <!-- Tab Content with transitions -->
       <div class="min-h-[400px]">
-        <!-- SECRETS TAB -->
-        <div v-if="activeTab === 'secrets'" class="space-y-5">
-          <div class="flex items-center justify-between">
-            <div>
-              <h2 class="text-lg font-semibold text-white">Secrets</h2>
-              <p class="text-xs text-slate-500 mt-0.5">Securely store API keys and tokens for this project.</p>
-            </div>
-            <button
-              @click="showSecretModal = true"
-              class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98]"
-              aria-label="Add new secret"
-            >
-              <UIcon name="i-heroicons-plus" class="w-4 h-4" />
-              Add Secret
-            </button>
-          </div>
-
-          <div class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
-            <div v-if="secrets.length === 0" class="p-16 text-center">
-              <div class="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
-                <UIcon name="i-heroicons-lock-closed" class="w-7 h-7 text-slate-600" />
+        <Transition name="tab-fade" mode="out-in">
+          <!-- Secrets -->
+          <div v-if="activeTab === 'secrets'" key="secrets" class="space-y-5">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-lg font-semibold text-white">Secrets</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Securely store API keys and tokens for this project.</p>
               </div>
-              <p class="text-sm font-semibold text-slate-300 mb-1">No secrets stored</p>
-              <p class="text-xs text-slate-500 max-w-xs mx-auto">Add API keys, tokens, or other sensitive values for this project.</p>
-            </div>
-
-            <div v-else>
-              <div class="hidden md:grid grid-cols-12 gap-4 px-5 py-3 bg-white/5 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-white/5">
-                <div class="col-span-3">Key Name</div>
-                <div class="col-span-7">Value</div>
-                <div class="col-span-2 text-right">Actions</div>
-              </div>
-
-              <div
-                v-for="s in secrets"
-                :key="s.id"
-                class="px-5 py-4 border-b border-white/5 last:border-0 hover:bg-white/[0.03] transition-colors duration-150 flex flex-col md:grid md:grid-cols-12 gap-4 items-start md:items-center"
-              >
-                <div class="md:col-span-3 font-medium text-white text-sm flex items-center gap-2">
-                  <UIcon name="i-heroicons-key" class="w-4 h-4 text-slate-500 shrink-0" />
-                  <span class="truncate">{{ s.key_name }}</span>
-                </div>
-
-                <div class="md:col-span-7 w-full">
-                  <button
-                    @click="s.isRevealed = !s.isRevealed"
-                    class="w-full text-left relative bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm focus:border-primary/40 focus:outline-none transition-all duration-150 group"
-                    :aria-label="s.isRevealed ? 'Hide value' : 'Show value'"
-                  >
-                    <span
-                      :class="!s.isRevealed ? 'blur-sm select-none opacity-50' : 'opacity-100'"
-                      class="block transition-all duration-300 truncate font-mono"
-                    >
-                      {{ s.isRevealed ? s.value : '••••••••••••••••••••••••' }}
-                    </span>
-                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-600 font-semibold opacity-0 group-hover:opacity-100 transition-opacity hidden md:block">
-                      {{ s.isRevealed ? 'Hide' : 'Show' }}
-                    </span>
-                  </button>
-                </div>
-
-                <div class="md:col-span-2 flex items-center justify-end gap-2 w-full md:w-auto">
-                  <button
-                    @click="copyToClipboard(s.value, s.id)"
-                    class="p-2 rounded-xl hover:bg-white/8 transition-colors duration-150 flex items-center justify-center"
-                    :class="copiedSecretId === s.id ? 'text-emerald-400' : 'text-slate-400 hover:text-white'"
-                    :aria-label="copiedSecretId === s.id ? 'Copied' : 'Copy to clipboard'"
-                  >
-                    <UIcon :name="copiedSecretId === s.id ? 'i-heroicons-check' : 'i-heroicons-clipboard'" class="w-5 h-5" />
-                    <span class="text-xs font-medium ml-2 md:hidden">{{ copiedSecretId === s.id ? 'Copied' : 'Copy' }}</span>
-                  </button>
-                  <button
-                    @click="deleteSecret(s.id)"
-                    class="p-2 rounded-xl hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-colors duration-150 flex items-center justify-center"
-                    aria-label="Delete secret"
-                  >
-                    <UIcon name="i-heroicons-trash" class="w-5 h-5" />
-                    <span class="text-xs font-medium ml-2 md:hidden">Delete</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- NOTES TAB -->
-        <div v-if="activeTab === 'notes'" class="space-y-5">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 class="text-lg font-semibold text-white">Notes</h2>
-              <p class="text-xs text-slate-500 mt-0.5">Markdown supported · project context & documentation</p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-              <button
-                v-if="!isEditingNotes"
-                @click="isEditingNotes = true"
-                class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-white/5 hover:bg-white/8 border border-white/6 text-slate-400 hover:text-white transition-all duration-150"
-              >
-                <UIcon name="i-heroicons-pencil-square" class="w-4 h-4" />
-                Edit
-              </button>
-              <template v-else>
-                <div class="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/6">
-                  <button @click="isPreviewMode = false" :class="!isPreviewMode ? 'bg-primary text-white' : 'text-slate-400 hover:text-white'" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-150">Write</button>
-                  <button @click="isPreviewMode = true"  :class="isPreviewMode  ? 'bg-primary text-white' : 'text-slate-400 hover:text-white'" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-150">Preview</button>
-                </div>
-                <button @click="isEditingNotes = false" class="px-3 py-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors">Cancel</button>
-                <button @click="saveNotes" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98]">
-                  <UIcon name="i-heroicons-check" class="w-4 h-4" />
-                  Save
-                </button>
-              </template>
-            </div>
-          </div>
-
-          <div class="relative">
-            <textarea
-              v-if="isEditingNotes && !isPreviewMode"
-              v-model="notesDraft"
-              rows="18"
-              class="w-full bg-white/[0.03] border border-white/6 rounded-2xl px-6 py-5 text-sm text-slate-300 placeholder-slate-600 focus:outline-none focus:border-primary/40 focus:bg-white/[0.04] transition-all duration-150 leading-relaxed resize-y font-mono"
-              placeholder="# Notes, credentials, deployment steps…"
-            ></textarea>
-
-            <div v-else class="bg-white/[0.03] border border-white/6 rounded-2xl p-8 min-h-[400px]">
-              <div
-                v-if="notesDraft"
-                class="prose prose-invert max-w-none prose-indigo leading-relaxed text-slate-300"
-                v-html="highlightedNotes"
-              ></div>
-              <div v-else class="flex flex-col items-center justify-center h-full py-20 text-slate-500">
-                <UIcon name="i-heroicons-pencil" class="w-12 h-12 opacity-20 mb-4" />
-                <p class="text-sm font-medium">No notes yet</p>
-                <p class="text-xs mt-1">Click "Edit" to add project documentation.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- FILES TAB -->
-        <div v-if="activeTab === 'files'" class="space-y-5">
-          <div class="flex items-center justify-between">
-            <div>
-              <h2 class="text-lg font-semibold text-white">Files</h2>
-              <p class="text-xs text-slate-500 mt-0.5">Upload and manage project documents.</p>
-            </div>
-          </div>
-
-          <div class="relative cursor-pointer group">
-            <input
-              type="file"
-              @change="handleFileUpload"
-              class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              :disabled="uploading"
-              aria-label="Upload a file"
-            />
-            <div class="border-2 border-dashed border-white/8 rounded-2xl p-16 text-center hover:border-primary/30 hover:bg-white/[0.02] transition-all duration-150">
-              <div v-if="uploading" class="flex flex-col items-center text-primary animate-pulse">
-                <UIcon name="i-heroicons-arrow-path" class="w-10 h-10 animate-spin mb-4" />
-                <span class="text-sm font-semibold">Uploading…</span>
-              </div>
-              <div v-else class="flex flex-col items-center gap-4 text-slate-500">
-                <div class="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-primary/10 group-hover:text-primary transition-all duration-150">
-                  <UIcon name="i-heroicons-cloud-arrow-up" class="w-8 h-8" />
-                </div>
-                <div>
-                  <p class="text-white font-semibold text-base mb-1">Click or drag to upload</p>
-                  <p class="text-xs uppercase tracking-wider">PDF, PNG, JPG (Max 5MB)</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="files.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div
-              v-for="f in files"
-              :key="f.id"
-              class="flex items-center justify-between bg-white/[0.03] border border-white/6 rounded-2xl p-4 hover:bg-white/[0.05] hover:border-white/10 transition-all duration-150 group"
-            >
-              <div class="flex items-center gap-4 overflow-hidden">
-                <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <UIcon name="i-heroicons-document-text" class="w-5 h-5 text-primary" />
-                </div>
-                <div class="min-w-0">
-                  <p class="text-sm font-semibold text-white truncate">{{ f.file_name }}</p>
-                  <p class="text-[10px] text-slate-500 mt-0.5">{{ new Date(f.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) }}</p>
-                </div>
-              </div>
-              <button
-                @click="downloadFile(f.file_path)"
-                class="p-2 rounded-xl hover:bg-white/8 text-slate-400 hover:text-white transition-colors duration-150 shrink-0"
-                aria-label="Download file"
-              >
-                <UIcon name="i-heroicons-arrow-down-tray" class="w-5 h-5" />
+              <button @click="showSecretModal = true" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-[0.98]">
+                <UIcon name="i-heroicons-plus" class="w-4 h-4" /> Add Secret
               </button>
             </div>
-          </div>
 
-          <div v-else-if="!uploading" class="text-center py-12">
-            <p class="text-sm text-slate-500">No files uploaded yet for this project.</p>
-          </div>
-        </div>
-
-        <!-- MILESTONES TAB -->
-        <div v-if="activeTab === 'milestones'" class="space-y-5">
-          <div>
-            <h2 class="text-lg font-semibold text-white mb-1">Milestones</h2>
-            <p class="text-xs text-slate-500">Track key deliverables and deadlines.</p>
-          </div>
-          <ProjectMilestonesTab :project-id="projectId" />
-        </div>
-
-        <!-- CALENDAR TAB -->
-        <div v-if="activeTab === 'calendar'" class="space-y-5">
-          <div>
-            <h2 class="text-lg font-semibold text-white mb-1">Calendar</h2>
-            <p class="text-xs text-slate-500">Visual timeline of project events.</p>
-          </div>
-          <CalendarView :project-id="projectId" />
-        </div>
-
-        <!-- BRIEF TAB -->
-        <div v-if="activeTab === 'brief'" class="space-y-5">
-          <div>
-            <h2 class="text-lg font-semibold text-white mb-1">Client Brief</h2>
-            <p class="text-xs text-slate-500">Onboarding submission linked to this project.</p>
-          </div>
-
-          <div v-if="!briefSubmission" class="border-2 border-dashed border-white/8 rounded-2xl py-16 text-center">
-            <div class="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
-              <UIcon name="i-heroicons-clipboard-document-list" class="w-7 h-7 text-slate-600" />
-            </div>
-            <p class="text-sm font-semibold text-slate-300 mb-1">No onboarding brief linked</p>
-            <p class="text-xs text-slate-500 mb-5">This project has no onboarding submission attached yet.</p>
-            <NuxtLink
-              :to="`/onboarding?client=${clientData?.id}`"
-              class="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
-            >
-              <UIcon name="i-heroicons-arrow-right" class="w-4 h-4" />
-              Create Onboarding Form
-            </NuxtLink>
-          </div>
-
-          <div v-else class="space-y-5">
-            <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-6">
-              <div class="flex items-center justify-between mb-3">
-                <h3 class="text-base font-semibold text-white flex items-center gap-2">
-                  <UIcon name="i-heroicons-clipboard-document-check" class="w-5 h-5 text-emerald-400" />
-                  Client Brief
-                </h3>
-                <span class="text-xs text-slate-500">
-                  Submitted {{ new Date(briefSubmission.submitted_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) }}
-                </span>
+            <div class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
+              <div v-if="secrets.length === 0" class="p-16 text-center">
+                <div class="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
+                  <UIcon name="i-heroicons-lock-closed" class="w-7 h-7 text-slate-600" />
+                </div>
+                <p class="text-sm font-semibold text-slate-300 mb-1">No secrets stored</p>
+                <p class="text-xs text-slate-500 max-w-xs mx-auto">Add API keys, tokens, or other sensitive values for this project.</p>
               </div>
-              <p v-if="briefForm?.title" class="text-sm text-slate-400 mb-2">{{ briefForm.title }}</p>
-              <p v-if="briefSubmission.submitter_name" class="text-xs text-slate-500">
-                From: {{ briefSubmission.submitter_name }}
-                <span v-if="briefSubmission.submitter_email"> · {{ briefSubmission.submitter_email }}</span>
-              </p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <template v-for="field in (briefForm?.fields || []).sort((a: any, b: any) => a.position - b.position)" :key="field.id">
-                <div
-                  class="bg-white/[0.03] border border-white/6 rounded-2xl p-5"
-                  :class="field.type === 'textarea' ? 'md:col-span-2' : ''"
-                >
-                  <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">{{ field.label }}</p>
-                  <template v-if="field.type === 'file' || field.type === 'url'">
-                    <div v-if="Array.isArray(briefSubmission.responses[field.id]) && briefSubmission.responses[field.id].length" class="space-y-2">
-                      <a
-                        v-for="(url, idx) in briefSubmission.responses[field.id]"
-                        :key="idx"
-                        :href="url"
-                        target="_blank"
-                        class="flex items-center gap-2 text-primary hover:text-white text-sm transition-colors truncate"
-                      >
-                        <UIcon name="i-heroicons-link" class="w-4 h-4 shrink-0" />
-                        <span class="truncate">{{ url }}</span>
-                      </a>
-                    </div>
-                    <a
-                      v-else-if="briefSubmission.responses[field.id]"
-                      :href="briefSubmission.responses[field.id]"
-                      target="_blank"
-                      class="flex items-center gap-2 text-primary hover:text-white text-sm transition-colors truncate"
-                    >
-                      <UIcon name="i-heroicons-link" class="w-4 h-4 shrink-0" />
-                      <span class="truncate">{{ briefSubmission.responses[field.id] }}</span>
-                    </a>
-                    <p v-else class="text-sm text-slate-600 italic">—</p>
-                  </template>
-                  <p v-else class="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
-                    {{ briefSubmission.responses[field.id] || '—' }}
-                  </p>
+              <div v-else>
+                <div class="hidden md:grid grid-cols-12 gap-4 px-5 py-3 bg-white/5 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-white/5">
+                  <div class="col-span-3">Key Name</div>
+                  <div class="col-span-7">Value</div>
+                  <div class="col-span-2 text-right">Actions</div>
                 </div>
-              </template>
-            </div>
-
-            <div class="text-right">
-              <NuxtLink
-                v-if="briefForm?.id"
-                :to="`/onboarding/${briefForm.id}`"
-                class="text-xs text-slate-500 hover:text-primary transition-colors"
-              >
-                View full form & submission →
-              </NuxtLink>
-            </div>
-          </div>
-        </div>
-
-        <!-- REMINDERS TAB -->
-        <div v-if="activeTab === 'reminders'" class="space-y-6">
-          <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-6">
-            <h3 class="text-base font-semibold text-white mb-4">Invoice Reminders</h3>
-            <div class="space-y-4">
-              <label class="flex items-center gap-3 cursor-pointer">
-                <input v-model="reminderConfig.enabled" type="checkbox"
-                       class="w-4 h-4 rounded border-white/10 bg-white/5 text-primary focus:ring-primary" />
-                <span class="text-sm text-slate-300">Send automatic reminders for overdue invoices</span>
-              </label>
-
-              <div v-if="reminderConfig.enabled" class="space-y-4 pl-7">
-                <div class="space-y-1.5">
-                  <label class="text-xs font-semibold text-slate-400">Recipient Email (optional override)</label>
-                  <input v-model="reminderConfig.recipient_email" type="email"
-                         placeholder="Leave blank to use client's email"
-                         class="w-full sm:w-64 bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none" />
-                </div>
-
-                <div class="space-y-1.5">
-                  <label class="text-xs font-semibold text-slate-400">Frequency</label>
-                  <div class="relative w-full sm:w-48">
-                    <select v-model="reminderConfig.frequency"
-                            class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer">
-                      <option value="daily" class="bg-[#0d1525]">Daily</option>
-                      <option value="weekly" class="bg-[#0d1525]">Weekly</option>
-                      <option value="biweekly" class="bg-[#0d1525]">Every 2 Weeks</option>
-                      <option value="monthly" class="bg-[#0d1525]">Monthly</option>
-                    </select>
-                    <UIcon name="i-heroicons-chevron-up-down"
-                           class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
+                <div v-for="s in secrets" :key="s.id" class="px-5 py-4 border-b border-white/5 last:border-0 hover:bg-white/[0.03] transition-colors flex flex-col md:grid md:grid-cols-12 gap-4 items-start md:items-center">
+                  <div class="md:col-span-3 font-medium text-white text-sm flex items-center gap-2">
+                    <UIcon name="i-heroicons-key" class="w-4 h-4 text-slate-500 shrink-0" />
+                    <span class="truncate">{{ s.key_name }}</span>
+                  </div>
+                  <div class="md:col-span-7 w-full">
+                    <button @click="s.isRevealed = !s.isRevealed" class="w-full text-left relative bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm focus:border-primary/40 focus:outline-none transition-all group">
+                      <span :class="!s.isRevealed ? 'blur-sm select-none opacity-50' : 'opacity-100'" class="block transition-all duration-300 truncate font-mono">{{ s.isRevealed ? s.value : '••••••••••••••••••••••••' }}</span>
+                      <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-600 font-semibold opacity-0 group-hover:opacity-100 transition-opacity hidden md:block">{{ s.isRevealed ? 'Hide' : 'Show' }}</span>
+                    </button>
+                  </div>
+                  <div class="md:col-span-2 flex items-center justify-end gap-2 w-full md:w-auto">
+                    <button @click="copyToClipboard(s.value, s.id)" class="p-2 rounded-xl hover:bg-white/8 transition-colors flex items-center justify-center" :class="copiedSecretId === s.id ? 'text-emerald-400' : 'text-slate-400 hover:text-white'">
+                      <UIcon :name="copiedSecretId === s.id ? 'i-heroicons-check' : 'i-heroicons-clipboard'" class="w-5 h-5" />
+                      <span class="text-xs font-medium ml-2 md:hidden">{{ copiedSecretId === s.id ? 'Copied' : 'Copy' }}</span>
+                    </button>
+                    <button @click="requestDeleteSecret(s.id)" class="p-2 rounded-xl hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-colors flex items-center justify-center">
+                      <UIcon name="i-heroicons-trash" class="w-5 h-5" />
+                      <span class="text-xs font-medium ml-2 md:hidden">Delete</span>
+                    </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
 
-                <div class="space-y-1.5">
-                  <label class="text-xs font-semibold text-slate-400">Custom Message (optional)</label>
-                  <textarea v-model="reminderConfig.custom_message" rows="3"
-                            placeholder="Add a personal note to the reminder email..."
-                            class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none"></textarea>
-                </div>
-
-                <div class="pt-2">
-                  <button @click="sendTestEmail" :disabled="testEmailSending"
-                          class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-white/5 hover:bg-white/8 border border-white/6 text-slate-400 hover:text-white transition-all">
-                    <UIcon v-if="testEmailSending" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
-                    <UIcon v-else name="i-heroicons-envelope" class="w-4 h-4" />
-                    {{ testEmailSending ? 'Sending...' : 'Send Test Email to Yourself' }}
+          <!-- Notes -->
+          <div v-else-if="activeTab === 'notes'" key="notes" class="space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 class="text-lg font-semibold text-white">Notes</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Markdown supported · project context & documentation</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <button v-if="!isEditingNotes" @click="isEditingNotes = true" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-white/5 hover:bg-white/8 border border-white/6 text-slate-400 hover:text-white transition-all">
+                  <UIcon name="i-heroicons-pencil-square" class="w-4 h-4" /> Edit
+                </button>
+                <template v-else>
+                  <div class="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/6">
+                    <button @click="isPreviewMode = false" :class="!isPreviewMode ? 'bg-primary text-white' : 'text-slate-400 hover:text-white'" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all">Write</button>
+                    <button @click="isPreviewMode = true" :class="isPreviewMode ? 'bg-primary text-white' : 'text-slate-400 hover:text-white'" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all">Preview</button>
+                  </div>
+                  <button @click="isEditingNotes = false" class="px-3 py-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors">Cancel</button>
+                  <button @click="saveNotes" :disabled="savingNotes" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-[0.98] disabled:opacity-50">
+                    <UIcon v-if="savingNotes" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
+                    <UIcon v-else name="i-heroicons-check" class="w-4 h-4" />
+                    {{ savingNotes ? 'Saving...' : 'Save' }}
                   </button>
-                  <p v-if="testEmailResult" class="text-xs mt-2" :class="testEmailResult === 'sent' ? 'text-emerald-400' : 'text-red-400'">
-                    {{ testEmailResult === 'sent' ? 'Test email sent! Check your inbox.' : 'Failed to send test email.' }}
-                  </p>
+                </template>
+              </div>
+            </div>
+            <div class="relative">
+              <textarea v-if="isEditingNotes && !isPreviewMode" v-model="notesDraft" rows="18" class="w-full bg-white/[0.03] border border-white/6 rounded-2xl px-6 py-5 text-sm text-slate-300 placeholder-slate-600 focus:outline-none focus:border-primary/40 focus:bg-white/[0.04] transition-all leading-relaxed resize-y font-mono" placeholder="# Notes, credentials, deployment steps…"></textarea>
+              <div v-else class="bg-white/[0.03] border border-white/6 rounded-2xl p-8 min-h-[400px]">
+                <div v-if="notesDraft" class="prose prose-invert max-w-none prose-indigo leading-relaxed text-slate-300" v-html="highlightedNotes"></div>
+                <div v-else class="flex flex-col items-center justify-center h-full py-20 text-slate-500">
+                  <UIcon name="i-heroicons-pencil" class="w-12 h-12 opacity-20 mb-4" />
+                  <p class="text-sm font-medium">No notes yet</p>
+                  <p class="text-xs mt-1">Click "Edit" to add project documentation.</p>
                 </div>
               </div>
+            </div>
+          </div>
 
-              <div class="pt-4 border-t border-white/5">
-                <button @click="saveReminderConfig" :disabled="savingReminder"
-                        class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98] disabled:opacity-50">
-                  <UIcon v-if="savingReminder" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
-                  <span v-else>Save Settings</span>
+          <!-- Files -->
+          <div v-else-if="activeTab === 'files'" key="files" class="space-y-5">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-lg font-semibold text-white">Files</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Upload and manage project documents.</p>
+              </div>
+            </div>
+            <div class="relative cursor-pointer group">
+              <input type="file" @change="handleFileUpload" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" :disabled="uploading" />
+              <div class="border-2 border-dashed border-white/8 rounded-2xl p-16 text-center hover:border-primary/30 hover:bg-white/[0.02] transition-all">
+                <div v-if="uploading" class="flex flex-col items-center text-primary animate-pulse">
+                  <UIcon name="i-heroicons-arrow-path" class="w-10 h-10 animate-spin mb-4" />
+                  <span class="text-sm font-semibold">Uploading…</span>
+                </div>
+                <div v-else class="flex flex-col items-center gap-4 text-slate-500">
+                  <div class="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-primary/10 group-hover:text-primary transition-all">
+                    <UIcon name="i-heroicons-cloud-arrow-up" class="w-8 h-8" />
+                  </div>
+                  <div>
+                    <p class="text-white font-semibold text-base mb-1">Click or drag to upload</p>
+                    <p class="text-xs uppercase tracking-wider">PDF, PNG, JPG (Max 5MB)</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-if="files.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div v-for="f in files" :key="f.id" class="flex items-center justify-between bg-white/[0.03] border border-white/6 rounded-2xl p-4 hover:bg-white/[0.05] hover:border-white/10 transition-all group">
+                <div class="flex items-center gap-4 overflow-hidden">
+                  <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                    <UIcon name="i-heroicons-document-text" class="w-5 h-5 text-primary" />
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-sm font-semibold text-white truncate">{{ f.file_name }}</p>
+                    <p class="text-[10px] text-slate-500 mt-0.5">{{ new Date(f.created_at).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }) }}</p>
+                  </div>
+                </div>
+                <button @click="downloadFile(f.file_path)" class="p-2 rounded-xl hover:bg-white/8 text-slate-400 hover:text-white transition-colors shrink-0">
+                  <UIcon name="i-heroicons-arrow-down-tray" class="w-5 h-5" />
                 </button>
               </div>
             </div>
+            <div v-else-if="!uploading" class="text-center py-12">
+              <p class="text-sm text-slate-500">No files uploaded yet for this project.</p>
+            </div>
           </div>
 
-          <!-- Logs -->
-          <div class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
-            <div class="px-5 py-4 border-b border-white/5">
-              <h3 class="text-sm font-semibold text-white">Recent Reminder Logs</h3>
+          <!-- Milestones -->
+          <div v-else-if="activeTab === 'milestones'" key="milestones" class="space-y-5">
+            <div>
+              <h2 class="text-lg font-semibold text-white mb-1">Milestones</h2>
+              <p class="text-xs text-slate-500">Track key deliverables and deadlines.</p>
             </div>
-            <div v-if="loadingLogs" class="p-5 text-center text-sm text-slate-500">Loading logs...</div>
-            <div v-else-if="reminderLogs.length === 0" class="p-5 text-center text-sm text-slate-500">
-              <UIcon name="i-heroicons-inbox" class="w-6 h-6 mx-auto mb-2 text-slate-600" />
-              No reminders sent yet.
+            <ProjectMilestonesTab :project-id="projectId" />
+          </div>
+
+          <!-- Calendar -->
+          <div v-else-if="activeTab === 'calendar'" key="calendar" class="space-y-5">
+            <div>
+              <h2 class="text-lg font-semibold text-white mb-1">Calendar</h2>
+              <p class="text-xs text-slate-500">Visual timeline of project events.</p>
             </div>
-            <div v-else class="divide-y divide-white/5">
-              <div v-for="log in reminderLogs" :key="log.id"
-                   class="flex items-center justify-between px-5 py-3 text-sm">
-                <div class="min-w-0 flex-1">
-                  <p class="text-white font-medium truncate">{{ log.sent_to }}</p>
-                  <p class="text-xs text-slate-500">{{ new Date(log.sent_at).toLocaleString() }}</p>
-                  <p v-if="log.error_message" class="text-xs text-red-400 mt-0.5">{{ log.error_message }}</p>
+            <CalendarView :project-id="projectId" />
+          </div>
+
+          <!-- Brief -->
+          <div v-else-if="activeTab === 'brief'" key="brief" class="space-y-5">
+            <div>
+              <h2 class="text-lg font-semibold text-white mb-1">Client Brief</h2>
+              <p class="text-xs text-slate-500">Onboarding submission linked to this project.</p>
+            </div>
+            <div v-if="!briefSubmission" class="border-2 border-dashed border-white/8 rounded-2xl py-16 text-center">
+              <div class="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
+                <UIcon name="i-heroicons-clipboard-document-list" class="w-7 h-7 text-slate-600" />
+              </div>
+              <p class="text-sm font-semibold text-slate-300 mb-1">No onboarding brief linked</p>
+              <p class="text-xs text-slate-500 mb-5">This project has no onboarding submission attached yet.</p>
+              <NuxtLink :to="`/onboarding?client=${clientData?.id}`" class="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary/80 transition-colors">
+                <UIcon name="i-heroicons-arrow-right" class="w-4 h-4" /> Create Onboarding Form
+              </NuxtLink>
+            </div>
+            <div v-else class="space-y-5">
+              <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-6">
+                <div class="flex items-center justify-between mb-3">
+                  <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                    <UIcon name="i-heroicons-clipboard-document-check" class="w-5 h-5 text-emerald-400" /> Client Brief
+                  </h3>
+                  <span class="text-xs text-slate-500">Submitted {{ new Date(briefSubmission.submitted_at).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }) }}</span>
                 </div>
-                <span :class="log.status === 'sent' ? 'text-emerald-400' : 'text-red-400'"
-                      class="text-xs font-semibold shrink-0 ml-4">
-                  {{ log.status === 'sent' ? 'Sent' : 'Failed' }}
-                </span>
+                <p v-if="briefForm?.title" class="text-sm text-slate-400 mb-2">{{ briefForm.title }}</p>
+                <p v-if="briefSubmission.submitter_name" class="text-xs text-slate-500">From: {{ briefSubmission.submitter_name }}<span v-if="briefSubmission.submitter_email"> · {{ briefSubmission.submitter_email }}</span></p>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <template v-for="field in (briefForm?.fields || []).sort((a: any, b: any) => a.position - b.position)" :key="field.id">
+                  <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-5" :class="field.type === 'textarea' ? 'md:col-span-2' : ''">
+                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">{{ field.label }}</p>
+                    <template v-if="field.type === 'file' || field.type === 'url'">
+                      <div v-if="Array.isArray(briefSubmission.responses[field.id]) && briefSubmission.responses[field.id].length" class="space-y-2">
+                        <a v-for="(url, idx) in briefSubmission.responses[field.id]" :key="idx" :href="url" target="_blank" class="flex items-center gap-2 text-primary hover:text-white text-sm transition-colors truncate">
+                          <UIcon name="i-heroicons-link" class="w-4 h-4 shrink-0" /> <span class="truncate">{{ url }}</span>
+                        </a>
+                      </div>
+                      <a v-else-if="briefSubmission.responses[field.id]" :href="briefSubmission.responses[field.id]" target="_blank" class="flex items-center gap-2 text-primary hover:text-white text-sm transition-colors truncate">
+                        <UIcon name="i-heroicons-link" class="w-4 h-4 shrink-0" /> <span class="truncate">{{ briefSubmission.responses[field.id] }}</span>
+                      </a>
+                      <p v-else class="text-sm text-slate-600 italic">—</p>
+                    </template>
+                    <p v-else class="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{{ briefSubmission.responses[field.id] || '—' }}</p>
+                  </div>
+                </template>
+              </div>
+              <div class="text-right">
+                <NuxtLink v-if="briefForm?.id" :to="`/onboarding/${briefForm.id}`" class="text-xs text-slate-500 hover:text-primary transition-colors">View full form & submission →</NuxtLink>
               </div>
             </div>
           </div>
-        </div>
+
+          <!-- Reminders -->
+          <div v-else-if="activeTab === 'reminders'" key="reminders" class="space-y-6">
+            <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-6">
+              <h3 class="text-base font-semibold text-white mb-4">Invoice Reminders</h3>
+              <div class="space-y-4">
+                <label class="flex items-center gap-3 cursor-pointer">
+                  <input v-model="reminderConfig.enabled" type="checkbox" class="w-4 h-4 rounded border-white/10 bg-white/5 text-primary focus:ring-primary" />
+                  <span class="text-sm text-slate-300">Send automatic reminders for overdue invoices</span>
+                </label>
+                <div v-if="reminderConfig.enabled" class="space-y-4 pl-7">
+                  <div class="space-y-1.5">
+                    <label class="text-xs font-semibold text-slate-400">Recipient Email (optional override)</label>
+                    <input v-model="reminderConfig.recipient_email" type="email" placeholder="Leave blank to use client's email" class="w-full sm:w-64 bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none" />
+                  </div>
+                  <div class="space-y-1.5">
+                    <label class="text-xs font-semibold text-slate-400">Frequency</label>
+                    <div class="relative w-full sm:w-48">
+                      <select v-model="reminderConfig.frequency" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer">
+                        <option value="daily" class="bg-[#0d1525]">Daily</option>
+                        <option value="weekly" class="bg-[#0d1525]">Weekly</option>
+                        <option value="biweekly" class="bg-[#0d1525]">Every 2 Weeks</option>
+                        <option value="monthly" class="bg-[#0d1525]">Monthly</option>
+                      </select>
+                      <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
+                    </div>
+                  </div>
+                  <div class="space-y-1.5">
+                    <label class="text-xs font-semibold text-slate-400">Custom Message (optional)</label>
+                    <textarea v-model="reminderConfig.custom_message" rows="3" placeholder="Add a personal note to the reminder email..." class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none"></textarea>
+                  </div>
+                  <div class="pt-2">
+                    <button @click="sendTestEmail" :disabled="testEmailSending" class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-white/5 hover:bg-white/8 border border-white/6 text-slate-400 hover:text-white transition-all disabled:opacity-50">
+                      <UIcon v-if="testEmailSending" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
+                      <UIcon v-else name="i-heroicons-envelope" class="w-4 h-4" />
+                      {{ testEmailSending ? 'Sending...' : 'Send Test Email to Yourself' }}
+                    </button>
+                    <p v-if="testEmailResult" class="text-xs mt-2" :class="testEmailResult === 'sent' ? 'text-emerald-400' : 'text-red-400'">{{ testEmailResult === 'sent' ? 'Test email sent! Check your inbox.' : 'Failed to send test email.' }}</p>
+                  </div>
+                </div>
+                <div class="pt-4 border-t border-white/5">
+                  <button @click="saveReminderConfig" :disabled="savingReminder" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 transition-all active:scale-[0.98] disabled:opacity-50">
+                    <UIcon v-if="savingReminder" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
+                    <span v-else>Save Settings</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
+              <div class="px-5 py-4 border-b border-white/5">
+                <h3 class="text-sm font-semibold text-white">Recent Reminder Logs</h3>
+              </div>
+              <div v-if="loadingLogs" class="p-5 text-center text-sm text-slate-500">Loading logs...</div>
+              <div v-else-if="reminderLogs.length === 0" class="p-5 text-center text-sm text-slate-500">
+                <UIcon name="i-heroicons-inbox" class="w-6 h-6 mx-auto mb-2 text-slate-600" /> No reminders sent yet.
+              </div>
+              <div v-else class="divide-y divide-white/5">
+                <div v-for="log in reminderLogs" :key="log.id" class="flex items-center justify-between px-5 py-3 text-sm">
+                  <div class="min-w-0 flex-1">
+                    <p class="text-white font-medium truncate">{{ log.sent_to }}</p>
+                    <p class="text-xs text-slate-500">{{ new Date(log.sent_at).toLocaleString() }}</p>
+                    <p v-if="log.error_message" class="text-xs text-red-400 mt-0.5">{{ log.error_message }}</p>
+                  </div>
+                  <span :class="log.status === 'sent' ? 'text-emerald-400' : 'text-red-400'" class="text-xs font-semibold shrink-0 ml-4">{{ log.status === 'sent' ? 'Sent' : 'Failed' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Transition>
       </div>
 
-      <!-- ===== Danger Zone ===== -->
+      <!-- Danger Zone -->
       <section class="pt-8 border-t border-white/5">
         <p class="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-4 flex items-center gap-1.5">
-          <UIcon name="i-heroicons-exclamation-triangle" class="w-3.5 h-3.5" aria-hidden="true" />
-          Danger Zone
+          <UIcon name="i-heroicons-exclamation-triangle" class="w-3.5 h-3.5" /> Danger Zone
         </p>
         <div class="bg-red-500/[0.04] border border-red-500/10 rounded-2xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <p class="text-sm font-semibold text-white mb-0.5">Delete this project</p>
-            <p class="text-xs text-slate-500 leading-relaxed">
-              Permanently removes the project along with all secrets, files, and events. This action cannot be undone.
-            </p>
+            <p class="text-xs text-slate-500 leading-relaxed">Permanently removes the project along with all secrets, files, and events. This action cannot be undone.</p>
           </div>
-          <button
-            @click="deleteProject"
-            :disabled="isDeleting"
-            class="shrink-0 flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500 border border-red-500/20 hover:border-transparent text-red-400 hover:text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 disabled:opacity-50 active:scale-[0.98]"
-            aria-label="Delete project permanently"
-          >
+          <button @click="showDeleteProjectConfirm = true" :disabled="isDeleting" class="shrink-0 flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500 border border-red-500/20 hover:border-transparent text-red-400 hover:text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 active:scale-[0.98]">
             <UIcon v-if="isDeleting" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
-            <template v-else>
-              <UIcon name="i-heroicons-trash" class="w-4 h-4" aria-hidden="true" />
-              Delete Project
-            </template>
+            <template v-else><UIcon name="i-heroicons-trash" class="w-4 h-4" /> Delete Project</template>
           </button>
         </div>
       </section>
     </div>
 
-    <!-- ===== Add Secret Modal ===== -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div
-          v-if="showSecretModal"
-          class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="secret-modal-title"
-        >
-          <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="showSecretModal = false" aria-hidden="true"></div>
-          <div class="relative w-full sm:max-w-md bg-[#0d1525] border border-white/8 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh]">
-            <div class="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
-              <div class="w-10 h-1 rounded-full bg-white/10"></div>
-            </div>
-            <div class="px-6 py-5 border-b border-white/5 flex items-center justify-between shrink-0">
-              <div>
-                <h2 id="secret-modal-title" class="text-base font-bold text-white">New Secret</h2>
-                <p class="text-xs text-slate-500 mt-0.5">For {{ projectData?.name }}</p>
-              </div>
-              <button @click="showSecretModal = false" class="w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/8 transition-all" aria-label="Close modal">
-                <UIcon name="i-heroicons-x-mark" class="w-5 h-5" />
-              </button>
-            </div>
-            <div class="overflow-y-auto flex-1 px-6 py-5">
-              <form @submit.prevent="addSecret" class="space-y-5" id="new-secret-form">
-                <div class="space-y-1.5">
-                  <label for="secret-key" class="block text-xs font-semibold text-slate-400">Key Name</label>
-                  <input id="secret-key" v-model="newSecret.name" type="text" required placeholder="e.g. STRIPE_SECRET_KEY" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
-                </div>
-                <div class="space-y-1.5">
-                  <label for="secret-value" class="block text-xs font-semibold text-slate-400">Value</label>
-                  <input id="secret-value" v-model="newSecret.value" type="text" required placeholder="sk_test_..." class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 font-mono focus:border-primary/50 focus:outline-none transition-all duration-150" />
-                </div>
-              </form>
-            </div>
-            <div class="px-6 py-4 border-t border-white/5 shrink-0 flex gap-2.5">
-              <button type="button" @click="showSecretModal = false" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all">Cancel</button>
-              <button type="submit" form="new-secret-form" class="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98]">
-                <UIcon name="i-heroicons-lock-closed" class="w-4 h-4" />
-                Save Secret
-              </button>
-            </div>
-          </div>
+    <!-- Add Secret Modal -->
+    <ModalBase :open="showSecretModal" title="New Secret" :subtitle="`For ${projectData?.name}`" @close="showSecretModal = false">
+      <form @submit.prevent="addSecret" class="space-y-5">
+        <div class="space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-400">Key Name</label>
+          <input v-model="newSecret.name" type="text" required placeholder="e.g. STRIPE_SECRET_KEY" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none" />
         </div>
-      </Transition>
-    </Teleport>
+        <div class="space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-400">Value</label>
+          <input v-model="newSecret.value" type="text" required placeholder="sk_test_..." class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 font-mono focus:border-primary/50 focus:outline-none" />
+        </div>
+      </form>
+      <template #footer>
+        <div class="flex gap-2.5">
+          <button @click="showSecretModal = false" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all">Cancel</button>
+          <button @click="addSecret" :disabled="savingSecret" class="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-primary/20 transition-all active:scale-[0.98] disabled:opacity-50">
+            <UIcon v-if="savingSecret" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
+            <UIcon v-else name="i-heroicons-lock-closed" class="w-4 h-4" />
+            {{ savingSecret ? 'Saving...' : 'Save Secret' }}
+          </button>
+        </div>
+      </template>
+    </ModalBase>
 
-    <!-- ===== Edit Project Modal ===== -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div
-          v-if="showEditModal"
-          class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="edit-modal-title"
-        >
-          <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="showEditModal = false" aria-hidden="true"></div>
-          <div class="relative w-full sm:max-w-lg bg-[#0d1525] border border-white/8 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh]">
-            <div class="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
-              <div class="w-10 h-1 rounded-full bg-white/10"></div>
-            </div>
-            <div class="px-6 py-5 border-b border-white/5 flex items-center justify-between shrink-0">
-              <div>
-                <h2 id="edit-modal-title" class="text-base font-bold text-white">Edit Project</h2>
-                <p class="text-xs text-slate-500 mt-0.5">{{ projectData?.name }}</p>
-              </div>
-              <button @click="showEditModal = false" class="w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/8 transition-all" aria-label="Close modal">
-                <UIcon name="i-heroicons-x-mark" class="w-5 h-5" />
-              </button>
-            </div>
-            <div class="overflow-y-auto flex-1 px-6 py-5">
-              <form @submit.prevent="saveEdit" class="space-y-5" id="edit-project-form">
-                <div class="space-y-1.5">
-                  <label for="proj-name" class="block text-xs font-semibold text-slate-400">Project Name</label>
-                  <input id="proj-name" v-model="editForm.name" type="text" required class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
-                </div>
-                <div class="space-y-1.5">
-                  <label for="proj-desc" class="block text-xs font-semibold text-slate-400">Description</label>
-                  <textarea id="proj-desc" v-model="editForm.description" rows="3" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150 resize-none"></textarea>
-                </div>
-                <div class="space-y-1.5">
-                  <label for="proj-status" class="block text-xs font-semibold text-slate-400">Status</label>
-                  <div class="relative">
-                    <select id="proj-status" v-model="editForm.status" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
-                      <option class="bg-black text-white" value="lead">Lead</option>
-                      <option class="bg-black text-white" value="proposal">Proposal</option>
-                      <option class="bg-black text-white" value="active">Active</option>
-                      <option class="bg-black text-white" value="review">Review</option>
-                      <option class="bg-black text-white" value="complete">Complete</option>
-                      <option class="bg-black text-white" value="archived">Archived</option>
-                    </select>
-                    <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
-                  </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                  <div class="space-y-1.5">
-                    <label for="proj-start" class="block text-xs font-semibold text-slate-400">Start Date</label>
-                    <input id="proj-start" v-model="editForm.start_date" type="date" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
-                  </div>
-                  <div class="space-y-1.5">
-                    <label for="proj-end" class="block text-xs font-semibold text-slate-400">End Date</label>
-                    <input id="proj-end" v-model="editForm.end_date" type="date" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
-                  </div>
-                </div>
-                <div class="space-y-1.5">
-                  <label for="proj-budget" class="block text-xs font-semibold text-slate-400">Budget</label>
-                  <div class="flex gap-2">
-                    <div class="relative flex-1">
-                      <select v-model="editForm.currency" aria-label="Currency" class="absolute left-3 top-1/2 -translate-y-1/2 bg-transparent text-xs font-semibold text-slate-400 focus:outline-none appearance-none cursor-pointer w-12 z-10">
-                        <option class="bg-black text-white" value="NGN">NGN</option>
-                        <option class="bg-black text-white" value="USD">USD</option>
-                        <option class="bg-black text-white" value="GBP">GBP</option>
-                        <option class="bg-black text-white" value="EUR">EUR</option>
-                      </select>
-                      <input id="proj-budget" v-model="editForm.budget" type="number" min="0" step="1" placeholder="0" class="w-full bg-white/[0.04] border border-white/8 rounded-xl pl-14 pr-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
-                    </div>
-                  </div>
-                </div>
-              </form>
-            </div>
-            <div class="px-6 py-4 border-t border-white/5 shrink-0 flex gap-2.5">
-              <button type="button" @click="showEditModal = false" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all">Cancel</button>
-              <button type="submit" form="edit-project-form" :disabled="savingEdit" class="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98]">
-                <UIcon v-if="savingEdit" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
-                <template v-else>
-                  <UIcon name="i-heroicons-check" class="w-4 h-4" />
-                  Save Changes
-                </template>
-              </button>
+    <!-- Edit Project Modal -->
+    <ModalBase :open="showEditModal" title="Edit Project" :subtitle="projectData?.name" @close="showEditModal = false">
+      <form @submit.prevent="saveEdit" class="space-y-5">
+        <div class="space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-400">Project Name</label>
+          <input v-model="editForm.name" type="text" required class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none" />
+        </div>
+        <div class="space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-400">Description</label>
+          <textarea v-model="editForm.description" rows="3" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none" />
+        </div>
+        <div class="space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-400">Status</label>
+          <div class="relative">
+            <select v-model="editForm.status" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer">
+              <option value="lead">Lead</option>
+              <option value="proposal">Proposal</option>
+              <option value="active">Active</option>
+              <option value="review">Review</option>
+              <option value="complete">Complete</option>
+              <option value="archived">Archived</option>
+            </select>
+            <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1.5">
+            <label class="block text-xs font-semibold text-slate-400">Start Date</label>
+            <input v-model="editForm.start_date" type="date" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none" />
+          </div>
+          <div class="space-y-1.5">
+            <label class="block text-xs font-semibold text-slate-400">End Date</label>
+            <input v-model="editForm.end_date" type="date" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none" />
+          </div>
+        </div>
+        <div class="space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-400">Budget</label>
+          <div class="flex gap-2">
+            <div class="relative flex-1">
+              <select v-model="editForm.currency" class="absolute left-3 top-1/2 -translate-y-1/2 bg-transparent text-xs font-semibold text-slate-400 focus:outline-none appearance-none cursor-pointer w-12 z-10">
+                <option value="NGN">NGN</option>
+                <option value="USD">USD</option>
+                <option value="GBP">GBP</option>
+                <option value="EUR">EUR</option>
+              </select>
+              <input v-model="editForm.budget" type="number" min="0" step="1" placeholder="0" class="w-full bg-white/[0.04] border border-white/8 rounded-xl pl-14 pr-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none" />
             </div>
           </div>
         </div>
-      </Transition>
-    </Teleport>
+      </form>
+      <template #footer>
+        <div class="flex gap-2.5">
+          <button @click="showEditModal = false" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all">Cancel</button>
+          <button @click="saveEdit" :disabled="savingEdit" class="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-primary/20 transition-all active:scale-[0.98]">
+            <UIcon v-if="savingEdit" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
+            <template v-else><UIcon name="i-heroicons-check" class="w-4 h-4" /> Save Changes</template>
+          </button>
+        </div>
+      </template>
+    </ModalBase>
+
+    <!-- Revoke Share Link Modal -->
+    <ModalBase :open="showRevokeShareConfirm" title="Revoke Share Link" subtitle="The old link will stop working." @close="showRevokeShareConfirm = false">
+      <p class="text-slate-400 text-sm">Anyone with the current link will lose access to this project.</p>
+      <template #footer>
+        <div class="flex gap-2.5">
+          <button @click="showRevokeShareConfirm = false" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all">Cancel</button>
+          <button @click="revokeShareLink" class="flex-1 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-red-500/20 transition-all">Revoke</button>
+        </div>
+      </template>
+    </ModalBase>
+
+    <!-- Delete Secret Confirmation Modal -->
+    <ModalBase :open="showDeleteSecretConfirm" title="Delete Secret" subtitle="This action cannot be undone." @close="showDeleteSecretConfirm = false">
+      <p class="text-slate-400 text-sm">Are you sure you want to delete this secret?</p>
+      <template #footer>
+        <div class="flex gap-2.5">
+          <button @click="showDeleteSecretConfirm = false" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all">Cancel</button>
+          <button @click="confirmDeleteSecret" class="flex-1 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-red-500/20 transition-all">Delete</button>
+        </div>
+      </template>
+    </ModalBase>
+
+    <!-- Delete Project Confirmation Modal -->
+    <ModalBase :open="showDeleteProjectConfirm" title="Delete Project" subtitle="This action cannot be undone." @close="showDeleteProjectConfirm = false">
+      <p class="text-slate-400 text-sm">Permanently removes the project along with all secrets, files, and events.</p>
+      <template #footer>
+        <div class="flex gap-2.5">
+          <button @click="showDeleteProjectConfirm = false" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all">Cancel</button>
+          <button @click="deleteProject" :disabled="isDeleting" class="flex-1 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-red-500/20 transition-all disabled:opacity-50">
+            <UIcon v-if="isDeleting" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
+            <span v-else>Delete Project</span>
+          </button>
+        </div>
+      </template>
+    </ModalBase>
 
     <!-- Toast -->
-    <Transition
-      enter-active-class="transform ease-out duration-300 transition"
-      enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
-      enter-to-class="translate-y-0 opacity-100 sm:translate-x-0"
-      leave-active-class="transition ease-in duration-100"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
+    <Transition enter-active-class="transform ease-out duration-300 transition" enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2" enter-to-class="translate-y-0 opacity-100 sm:translate-x-0" leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
       <div v-if="toast.show" class="fixed bottom-4 right-4 z-50">
-        <div class="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl border"
-             :class="toast.type === 'success' ? 'bg-[#0d1525] border-emerald-500/50' : 'bg-[#0d1525] border-red-500/50'">
-          <UIcon :name="toast.type === 'success' ? 'i-heroicons-check-circle' : 'i-heroicons-exclamation-circle'"
-                 class="w-5 h-5"
-                 :class="toast.type === 'success' ? 'text-emerald-400' : 'text-red-400'" />
+        <div class="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl border" :class="toast.type === 'success' ? 'bg-[#0d1525] border-emerald-500/50' : 'bg-[#0d1525] border-red-500/50'">
+          <UIcon :name="toast.type === 'success' ? 'i-heroicons-check-circle' : 'i-heroicons-exclamation-circle'" class="w-5 h-5" :class="toast.type === 'success' ? 'text-emerald-400' : 'text-red-400'" />
           <span class="font-semibold text-sm text-white">{{ toast.message }}</span>
         </div>
       </div>
     </Transition>
-
   </div>
 </template>
 
 <style scoped>
-.modal-enter-active, .modal-leave-active { transition: opacity 200ms ease; }
-.modal-enter-active .relative, .modal-leave-active .relative { transition: transform 200ms cubic-bezier(0.32, 0.72, 0, 1); }
-.modal-enter-from, .modal-leave-to { opacity: 0; }
-.modal-enter-from .relative { transform: translateY(24px) scale(0.98); }
-@media (max-width: 639px) { .modal-enter-from .relative { transform: translateY(100%); } }
+.fade-enter-active,
+.fade-leave-active { transition: opacity 0.15s ease; }
+.fade-enter-from,
+.fade-leave-to { opacity: 0; }
+.tab-fade-enter-active,
+.tab-fade-leave-active { transition: opacity 0.2s ease; }
+.tab-fade-enter-from,
+.tab-fade-leave-to { opacity: 0; }
 textarea::-webkit-scrollbar { width: 8px; }
 textarea::-webkit-scrollbar-track { background: transparent; }
 textarea::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
@@ -1113,6 +1040,4 @@ textarea::-webkit-scrollbar-thumb:hover { background: #475569; }
 :deep(.prose pre) { background: #0f172a; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; }
 :deep(.prose a) { color: #818cf8; }
 :deep(.prose blockquote) { border-left-color: #818cf8; color: #94a3b8; }
-.fade-enter-active, .fade-leave-active { transition: opacity 0.15s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

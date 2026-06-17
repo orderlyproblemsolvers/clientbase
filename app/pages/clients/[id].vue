@@ -1,11 +1,12 @@
 <script setup lang="ts">
 const route = useRoute()
-const client = useSupabaseClient()
+const supabase = useSupabaseClient()
 const user = useSupabaseUser()
 const clientId = route.params.id as string
 
 // ── State ────────────────────────────────────────────────────────────────────
 const loading       = ref(true)
+const fetchError    = ref('')
 const clientData    = ref<any>(null)
 const projects      = ref<any[]>([])
 const isDeleting    = ref(false)
@@ -13,32 +14,44 @@ const isSavingNotes = ref(false)
 const notesDirty    = ref(false)
 const notesValue    = ref('')
 
-// Quick Engagement modal
 const showEngagementModal = ref(false)
+const showDeleteConfirm   = ref(false)
+
+// Toast
+const toast = ref({ show: false, message: '', type: 'success' })
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+  toast.value = { show: true, message: msg, type }
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { toast.value.show = false }, 3000)
+}
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 const fetchData = async () => {
   loading.value = true
+  fetchError.value = ''
   try {
-    const { data: cData } = await client
+    const { data: cData, error: cError } = await supabase
       .from('clients')
       .select('*')
       .eq('id', clientId)
       .single()
 
+    if (cError) throw cError
     clientData.value = cData
     notesValue.value = cData?.notes || ''
     notesDirty.value = false
 
-    const { data: pData } = await client
+    const { data: pData } = await supabase
       .from('projects')
       .select('*')
       .eq('client_id', clientId)
       .order('created_at', { ascending: false })
 
     projects.value = pData || []
-  } catch (e) {
+  } catch (e: any) {
     console.error(e)
+    fetchError.value = e.message || 'Failed to load client data'
   } finally {
     loading.value = false
   }
@@ -56,15 +69,16 @@ const handleEngagementCreated = async (result: { projectId?: string; formId?: st
 const saveNotes = async () => {
   isSavingNotes.value = true
   try {
-    const { error } = await client
+    const { error } = await supabase
       .from('clients')
       .update({ notes: notesValue.value })
       .eq('id', clientId)
     if (error) throw error
     clientData.value.notes = notesValue.value
     notesDirty.value = false
+    showToast('Notes saved')
   } catch (e: any) {
-    alert('Failed to save notes: ' + e.message)
+    showToast(e.message || 'Failed to save notes', 'error')
   } finally {
     isSavingNotes.value = false
   }
@@ -72,13 +86,14 @@ const saveNotes = async () => {
 
 // ── Delete client ─────────────────────────────────────────────────────────────
 const deleteClient = async () => {
-  if (!confirm('Permanently delete this client and all associated projects and data?')) return
   isDeleting.value = true
   try {
-    await client.from('clients').delete().eq('id', clientId)
+    const { error } = await supabase.from('clients').delete().eq('id', clientId)
+    if (error) throw error
+    showDeleteConfirm.value = false
     return navigateTo('/')
   } catch (e: any) {
-    alert('Error: ' + e.message)
+    showToast(e.message || 'Failed to delete client', 'error')
   } finally {
     isDeleting.value = false
   }
@@ -102,7 +117,6 @@ const getInitials = (name: string) =>
 
 const activeProjects = computed(() => projects.value.filter(p => p.status === 'active').length)
 
-// Budget grouped by currency
 const budgetByCurrency = computed(() => {
   const map: Record<string, number> = {}
   projects.value.forEach(p => {
@@ -130,7 +144,7 @@ onMounted(() => fetchData())
     </nav>
 
     <!-- Loading Skeleton -->
-    <div v-if="loading && !clientData" class="space-y-6">
+    <div v-if="loading" class="space-y-6">
       <div class="flex items-center gap-4">
         <div class="w-16 h-16 rounded-2xl bg-white/5 animate-pulse"></div>
         <div class="space-y-2">
@@ -143,6 +157,14 @@ onMounted(() => fetchData())
       </div>
       <div class="h-12 bg-white/5 animate-pulse rounded-2xl"></div>
       <div class="h-64 bg-white/5 animate-pulse rounded-2xl"></div>
+    </div>
+
+    <!-- Error State -->
+    <div v-else-if="fetchError" class="flex flex-col items-center py-20 text-center">
+      <UIcon name="i-heroicons-exclamation-triangle" class="w-10 h-10 text-red-400 mb-4" />
+      <p class="text-white font-semibold mb-2">Failed to load client</p>
+      <p class="text-slate-400 text-sm mb-4">{{ fetchError }}</p>
+      <button @click="fetchData" class="px-4 py-2 bg-primary text-white rounded-xl text-sm font-semibold hover:bg-primary/90">Retry</button>
     </div>
 
     <div v-else-if="clientData" class="space-y-8">
@@ -402,7 +424,7 @@ onMounted(() => fetchData())
             </p>
           </div>
           <button
-            @click="deleteClient"
+            @click="showDeleteConfirm = true"
             :disabled="isDeleting"
             class="shrink-0 flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500 border border-red-500/20 hover:border-transparent text-red-400 hover:text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 disabled:opacity-50 active:scale-[0.98]"
             aria-label="Delete client permanently"
@@ -424,5 +446,60 @@ onMounted(() => fetchData())
       @close="showEngagementModal = false"
       @created="handleEngagementCreated"
     />
+
+    <!-- Delete Confirmation Modal -->
+    <ModalBase
+      :open="showDeleteConfirm"
+      title="Delete Client"
+      subtitle="This action cannot be undone."
+      @close="showDeleteConfirm = false"
+    >
+      <p class="text-slate-400 text-sm">
+        Are you sure you want to permanently delete {{ clientData?.name }} and all associated projects, files, and data?
+      </p>
+      <template #footer>
+        <div class="flex gap-2.5">
+          <button
+            @click="showDeleteConfirm = false"
+            class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            @click="deleteClient"
+            :disabled="isDeleting"
+            class="flex-1 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-red-500/20 transition-all disabled:opacity-50"
+          >
+            <UIcon v-if="isDeleting" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
+            <span v-else>Delete Client</span>
+          </button>
+        </div>
+      </template>
+    </ModalBase>
+
+    <!-- Toast -->
+    <Transition
+      enter-active-class="transform ease-out duration-300 transition"
+      enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
+      enter-to-class="translate-y-0 opacity-100 sm:translate-x-0"
+      leave-active-class="transition ease-in duration-100"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div v-if="toast.show" class="fixed bottom-4 right-4 z-50">
+        <div
+          class="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl border"
+          :class="toast.type === 'success' ? 'bg-[#0d1525] border-emerald-500/50' : 'bg-[#0d1525] border-red-500/50'"
+        >
+          <UIcon
+            :name="toast.type === 'success' ? 'i-heroicons-check-circle' : 'i-heroicons-exclamation-circle'"
+            class="w-5 h-5"
+            :class="toast.type === 'success' ? 'text-emerald-400' : 'text-red-400'"
+          />
+          <span class="font-semibold text-sm text-white">{{ toast.message }}</span>
+        </div>
+      </div>
+    </Transition>
+
   </div>
 </template>

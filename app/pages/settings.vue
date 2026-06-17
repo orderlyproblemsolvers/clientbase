@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import { usePreferences } from '~/composables/usePreferences'
+
 const { setProfile } = useUserProfile()
 
 const client = useSupabaseClient()
 const user   = useSupabaseUser()
 const config = useRuntimeConfig()
+
+const { prefs, fetchPreferences, setPreference } = usePreferences()
 
 const CLOUDINARY_CLOUD_NAME = config.public.CloudinaryCloudName
 const CLOUDINARY_PRESET     = config.public.CloudinaryPreset
@@ -24,6 +28,11 @@ const profile = ref({
 
 const passwordForm = ref({ new_password: '', confirm_password: '' })
 
+// Brand colour state
+const activeTheme = ref('#4d48e5')
+const customHex = ref('#4d48e5')
+
+// Presets (optional, for quick picks)
 const themes = [
   { name: 'Ops Indigo',   hex: '#4d48e5' },
   { name: 'Cyber Blue',   hex: '#0ea5e9' },
@@ -31,7 +40,6 @@ const themes = [
   { name: 'Orange Alert', hex: '#f97316' },
   { name: 'Crimson',      hex: '#ef4444' },
 ]
-const activeTheme = ref('#4d48e5')
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const showToast = (msg: string, type = 'success') => {
@@ -39,7 +47,6 @@ const showToast = (msg: string, type = 'success') => {
   setTimeout(() => toast.value.show = false, 3000)
 }
 
-// Use getUser() — contacts the Supabase server to validate the session
 const getUserId = async (): Promise<string> => {
   if (user.value?.id) return user.value.id
   const { data } = await client.auth.getUser()
@@ -47,19 +54,41 @@ const getUserId = async (): Promise<string> => {
   throw new Error('Not authenticated — please log in again.')
 }
 
-// ── Fetch profile (was missing, called in onMounted) ──────────────────────────
+const applyTheme = (hex: string) => {
+  if (process.client) {
+    document.documentElement.style.setProperty('--color-primary', hex)
+    localStorage.setItem('ops-primary-color', hex)
+  }
+}
+
+// ── Load theme from DB or localStorage ────────────────────────────────────────
+const loadTheme = async () => {
+  if (prefs.value.brand_color) {
+    activeTheme.value = prefs.value.brand_color
+    customHex.value = prefs.value.brand_color
+    applyTheme(activeTheme.value)
+    return
+  }
+
+  // Fallback for legacy localStorage
+  if (process.client) {
+    const saved = localStorage.getItem('ops-primary-color')
+    if (saved) {
+      activeTheme.value = saved
+      customHex.value = saved
+      applyTheme(saved)
+      // Persist to DB so it's no longer legacy
+      await setPreference('brand_color', saved)
+    }
+  }
+}
+
+// ── Fetch profile ─────────────────────────────────────────────────────────────
 const fetchProfile = async () => {
   loading.value = true
   try {
     const userId = await getUserId()
-
     if (user.value?.email) profile.value.email = user.value.email
-
-    // Restore saved theme
-    if (process.client) {
-      const saved = localStorage.getItem('ops-primary-color')
-      if (saved) activeTheme.value = saved
-    }
 
     const { data, error } = await client
       .from('profiles')
@@ -75,7 +104,6 @@ const fetchProfile = async () => {
       profile.value.avatar_url = data.avatar_url || null
       if (data.avatar_url) avatarPreview.value = data.avatar_url
 
-      // Keep the global sidebar state in sync
       setProfile({
         full_name:  data.full_name,
         role:       data.role,
@@ -126,7 +154,7 @@ const handleAvatarChange = async (e: any) => {
     showToast('Avatar saved!')
   } catch (err: any) {
     showToast(err.message, 'error')
-    avatarPreview.value = profile.value.avatar_url // revert to saved
+    avatarPreview.value = profile.value.avatar_url
   } finally {
     saving.value = false
   }
@@ -177,14 +205,28 @@ const updatePassword = async () => {
   }
 }
 
-// ── Theme ─────────────────────────────────────────────────────────────────────
-const setTheme = (hex: string) => {
+// ── Brand colour setters ──────────────────────────────────────────────────────
+// Called when user clicks a preset
+const setTheme = async (hex: string) => {
   activeTheme.value = hex
-  if (process.client) {
-    document.documentElement.style.setProperty('--color-primary', hex)
-    localStorage.setItem('ops-primary-color', hex)
+  customHex.value = hex
+  applyTheme(hex)
+  await setPreference('brand_color', hex)
+  showToast(`Theme: ${themes.find(t => t.hex === hex)?.name || 'Custom'}`)
+}
+
+// Called when user types in hex input
+const applyCustomHex = async () => {
+  let hex = customHex.value.trim()
+  if (!hex.startsWith('#')) hex = '#' + hex
+  if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+    showToast('Invalid hex colour. Use #RRGGBB format.', 'error')
+    return
   }
-  showToast(`Theme: ${themes.find(t => t.hex === hex)?.name}`)
+  activeTheme.value = hex
+  applyTheme(hex)
+  await setPreference('brand_color', hex)
+  showToast('Brand colour updated!')
 }
 
 // ── Sign out everywhere ───────────────────────────────────────────────────────
@@ -194,7 +236,11 @@ const signOutEverywhere = async () => {
   navigateTo('/login')
 }
 
-onMounted(() => fetchProfile())
+onMounted(async () => {
+  await fetchPreferences()
+  await loadTheme()
+  await fetchProfile()
+})
 </script>
 
 <template>
@@ -320,28 +366,78 @@ onMounted(() => fetchProfile())
           </div>
         </div>
 
-        <!-- APPEARANCE TAB -->
+        <!-- APPEARANCE TAB (brand colour) -->
         <div v-else-if="activeTab === 'appearance'" class="max-w-2xl space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
           <div class="bg-white/3 border border-white/6 rounded-2xl p-6">
-            <h3 class="text-base font-semibold text-white mb-2">Interface Theme</h3>
-            <p class="text-slate-400 text-sm mb-6">Select your preferred accent color for the dashboard.</p>
+            <h3 class="text-base font-semibold text-white mb-2">Brand Colour</h3>
+            <p class="text-slate-400 text-sm mb-6">Set the accent colour for your dashboard and client forms.</p>
             
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-              <button 
-                v-for="t in themes" 
-                :key="t.hex"
-                @click="setTheme(t.hex)"
-                class="group relative flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all hover:scale-105"
-                :class="activeTheme === t.hex ? 'bg-white/5 border-primary shadow-lg shadow-primary/10' : 'bg-white/3 border-white/6 hover:border-white/10'"
-              >
-                <div 
-                  class="w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-transform group-hover:rotate-12"
-                  :style="{ backgroundColor: t.hex }"
-                >
-                   <UIcon v-if="activeTheme === t.hex" name="i-heroicons-check" class="w-6 h-6 text-white" />
+            <!-- Colour picker + hex input -->
+            <div class="space-y-4">
+              <div class="flex items-center gap-4">
+                <!-- Native colour input -->
+                <div class="relative">
+                  <input
+                    type="color"
+                    :value="activeTheme"
+                    @input="(e: any) => { customHex = e.target.value; activeTheme = e.target.value; applyTheme(e.target.value); }"
+                    @change="(e: any) => { setTheme(e.target.value); }"
+                    class="w-14 h-14 rounded-xl cursor-pointer border-2 border-white/10 bg-transparent p-0.5"
+                    aria-label="Pick a brand colour"
+                  />
+                  <!-- Visual swatch overlay -->
+                  <div
+                    class="absolute inset-0.5 rounded-[10px] pointer-events-none"
+                    :style="{ backgroundColor: activeTheme }"
+                  ></div>
                 </div>
-                <span class="text-xs font-semibold" :class="activeTheme === t.hex ? 'text-white' : 'text-slate-500'">{{ t.name }}</span>
-              </button>
+
+                <!-- Hex text input -->
+                <div class="flex-1 relative">
+                  <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-mono">#</span>
+                  <input
+                    v-model="customHex"
+                    @keydown.enter.prevent="applyCustomHex"
+                    @blur="applyCustomHex"
+                    placeholder="4d48e5"
+                    class="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-4 py-3 text-sm text-white font-mono focus:border-primary/50 focus:outline-none transition-all duration-150"
+                    maxlength="7"
+                  />
+                </div>
+                <button
+                  @click="applyCustomHex"
+                  class="px-4 py-3 rounded-xl text-sm font-semibold bg-primary hover:bg-primary/90 text-white transition-all shadow-lg shadow-primary/20 active:scale-[0.98]"
+                >
+                  Apply
+                </button>
+              </div>
+
+              <!-- Current colour preview -->
+              <div class="flex items-center gap-2 text-xs text-slate-400">
+                <span>Current:</span>
+                <div class="w-4 h-4 rounded" :style="{ backgroundColor: activeTheme }"></div>
+                <span class="font-mono text-white">{{ activeTheme }}</span>
+              </div>
+            </div>
+
+            <!-- Quick presets -->
+            <div class="mt-8">
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Quick Presets</p>
+              <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                <button
+                  v-for="t in themes"
+                  :key="t.hex"
+                  @click="setTheme(t.hex)"
+                  class="flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all hover:scale-105"
+                  :class="activeTheme === t.hex ? 'bg-white/5 border-primary shadow-lg shadow-primary/10' : 'bg-white/3 border-white/6 hover:border-white/10'"
+                >
+                  <div
+                    class="w-10 h-10 rounded-full shadow-md"
+                    :style="{ backgroundColor: t.hex }"
+                  ></div>
+                  <span class="text-[10px] font-semibold" :class="activeTheme === t.hex ? 'text-white' : 'text-slate-500'">{{ t.name }}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
