@@ -4,8 +4,8 @@ import { useAuthStore } from '~/stores/auth'
 
 const auth = useAuthStore()
 const user = useSupabaseUser()
+const supabase = useSupabaseClient()
 
-// ── Sidebar state ─────────────────────────────────────────────────────────────
 const open = ref(false)
 const collapsed = ref(false)
 
@@ -14,18 +14,51 @@ watch(() => route.path, () => {
   open.value = false
 })
 
-// ── Display values from store ────────────────────────────────────────────────
 const displayName = computed(() => auth.displayName)
 const displayRole = computed(() => auth.displayRole)
 const displayInitial = computed(() => auth.displayInitial)
-
 const avatarUrl      = computed(() => auth.profile.avatar_url)
 const profileLoading = computed(() => auth.profileLoading)
 
-// ── Global search control ─────────────────────────────────────────────────────
 const { isOpen: showGlobalSearch } = useGlobalSearch()
 
-// ── Navigation Items ─────────────────────────────────────────────────────────
+const { data: prefsData } = await useAsyncData('global-prefs', async () => {
+  if (!user.value?.sub) return null
+  const { data } = await supabase
+    .from('profiles')
+    .select('preferences')
+    .eq('id', user.value.sub)
+    .single()
+  return data?.preferences || {}
+})
+
+const defaultBrandColor = '#4d48e5'
+const brandColor = computed(() => prefsData.value?.brand_color || defaultBrandColor)
+
+useHead(() => ({
+  style: [
+    {
+      id: 'brand-color',
+      innerHTML: `:root { --color-primary: ${brandColor.value}; }`
+    }
+  ]
+}))
+
+watch(brandColor, (newColor) => {
+  if (process.client) {
+    document.documentElement.style.setProperty('--color-primary', newColor)
+  }
+})
+
+watch(() => user.value?.sub, (newSub, oldSub) => {
+  if (!newSub && oldSub) {
+    if (process.client) {
+      document.documentElement.style.setProperty('--color-primary', defaultBrandColor)
+      localStorage.removeItem('ops-primary-color')
+    }
+  }
+})
+
 const navItems = computed<NavigationMenuItem[]>(() => [
   {
     label: 'Dashboard',
@@ -75,8 +108,6 @@ const navItems = computed<NavigationMenuItem[]>(() => [
 
 <template>
   <UDashboardGroup class="bg-base text-white">
-    
-    <!-- Sidebar -->
     <UDashboardSidebar
       v-model:open="open"
       v-model:collapsed="collapsed"
@@ -89,7 +120,6 @@ const navItems = computed<NavigationMenuItem[]>(() => [
         footer: 'border-t border-white/5 p-4',
       }"
     >
-      <!-- Desktop Sidebar Header -->
       <template #header>
         <NuxtLink to="/" class="flex items-center">
           <img
@@ -108,7 +138,6 @@ const navItems = computed<NavigationMenuItem[]>(() => [
       </template>
 
       <template #default>
-        <!-- Desktop Search Bar -->
         <UButton
           v-if="!collapsed"
           label="Search..."
@@ -192,15 +221,10 @@ const navItems = computed<NavigationMenuItem[]>(() => [
       </template>
     </UDashboardSidebar>
 
-    <!-- Main Content Panel -->
     <UDashboardPanel :ui="{
       root: 'no-scrollbar'
     }">
       <template #header>
-        <!-- 
-          Requirement #1: Remove "Dashboard" title on mobile and use logo.
-          Requirement #2: Remove search icon from header.
-        -->
         <UDashboardNavbar 
           :ui="{
             root: 'bg-base border-b border-white/5 no-scrollbar',
@@ -209,10 +233,8 @@ const navItems = computed<NavigationMenuItem[]>(() => [
         >
           <template #left>
             <div class="flex items-center gap-2">
-              <!-- Hamburger toggle (mobile) / Collapse toggle (desktop) -->
               <UDashboardSidebarCollapse class="text-slate-400 hover:text-white" />
               
-              <!-- Requirement #1: Logo in the header for mobile/desktop context -->
               <NuxtLink to="/" class="lg:hidden flex items-center">
                 <img
                   src="/img/clientbaselogo-white.png"
@@ -224,12 +246,10 @@ const navItems = computed<NavigationMenuItem[]>(() => [
           </template>
 
           <template #right>
-            <!-- Search removed from here as per Requirement #2 -->
           </template>
         </UDashboardNavbar>
       </template>
 
-      <!-- Requirement #3: Hide scrollbar on large screens -->
       <template #body>
         <div class="flex-1 overflow-y-auto no-scrollbar">
           <div class=" md:p-8">
@@ -244,12 +264,11 @@ const navItems = computed<NavigationMenuItem[]>(() => [
 </template>
 
 <style scoped>
-/* Requirement #3: CSS to hide scrollbars while maintaining scroll functionality */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 .no-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 </style>

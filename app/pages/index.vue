@@ -1,40 +1,116 @@
 <script setup lang="ts">
 const supabase = useSupabaseClient()
-const user     = useSupabaseUser()
+const user = useSupabaseUser()
 
-// ── State ─────────────────────────────────────────────────────────────────────
-const loading     = ref(true)
-const fetchError  = ref('')
-const clients     = ref<any[]>([])
+const clients = ref<any[]>([])
 const searchQuery = ref('')
 const showEngagementModal = ref(false)
 
-// Dashboard data
-const stats = ref({
-  totalClients:   0,
-  activeProjects: 0,
-  outstandingNGN: 0,
-  overdueCount:   0,
-})
-const overdueInvoices    = ref<any[]>([])
-const upcomingMilestones = ref<any[]>([])
-const tasksDueToday      = ref<any[]>([])
-const recentInvoices     = ref<any[]>([])
+const today = new Date()
+const todayStr = today.toISOString().split('T')[0]
+const in7DaysStr = new Date(today.getTime() + 7 * 86400000).toISOString().split('T')[0]
 
-// ── Computed ──────────────────────────────────────────────────────────────────
+const { pending: loading, error: fetchError, data: dashboardData } = await useAsyncData('dashboard', async () => {
+  const [
+    { data: clientData },
+    { count: projCount },
+    { data: invoiceData },
+    { data: recentInv },
+    { data: milestoneData },
+    { data: taskData }
+  ] = await Promise.all([
+    supabase.from('clients').select('*').order('created_at', { ascending: false }),
+    supabase.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+    supabase.from('retainers')
+      .select('id, title, amount, currency, status, due_date, invoice_number, clients(id, name), invoice_items(*)')
+      .in('status', ['pending', 'overdue'])
+      .order('due_date', { ascending: true }),
+    supabase.from('retainers')
+      .select('id, title, amount, currency, status, due_date, invoice_number, clients(id, name), invoice_items(*)')
+      .order('created_at', { ascending: false })
+      .limit(5),
+    supabase.from('milestones')
+      .select('id, title, due_date, status, project_id, projects(id, name, clients(id, name))')
+      .gte('due_date', todayStr).lte('due_date', in7DaysStr)
+      .neq('status', 'complete')
+      .order('due_date', { ascending: true })
+      .limit(6),
+    supabase.from('tasks')
+      .select('id, title, due_date, priority, status, project_id, milestones(id, title, projects(id, name, clients(id, name)))')
+      .lte('due_date', todayStr)
+      .neq('status', 'done')
+      .order('due_date', { ascending: true })
+      .limit(5)
+  ])
+
+  return {
+    clients: clientData || [],
+    activeProjects: projCount || 0,
+    invoices: invoiceData || [],
+    recentInvoices: recentInv || [],
+    milestones: milestoneData || [],
+    tasksDueToday: taskData || []
+  }
+})
+
+const stats = ref({ totalClients: 0, activeProjects: 0, outstandingNGN: 0, overdueCount: 0 })
+const upcomingMilestones = ref<any[]>([])
+const tasksDueToday = ref<any[]>([])
+const recentInvoices = ref<any[]>([])
+const overdueInvoices = ref<any[]>([])
+
+function getTotal(r: any): number {
+  if (r.invoice_items?.length)
+    return r.invoice_items.reduce((s: number, i: any) => s + Number(i.quantity) * Number(i.unit_rate), 0)
+  return Number(r.amount)
+}
+
+function computeStats(data: any) {
+  const clientsCount = data.clients.length
+  const activeProjects = data.activeProjects
+  const unpaid = data.invoices.filter((r: any) => r.status === 'pending' || r.status === 'overdue')
+  const outstandingNGN = unpaid
+    .filter((r: any) => r.currency === 'NGN')
+    .reduce((s: number, r: any) => s + getTotal(r), 0)
+  const overdueCount = unpaid.filter((r: any) =>
+    r.status === 'overdue' || (r.status === 'pending' && r.due_date && r.due_date < todayStr)
+  ).length
+
+  return { totalClients: clientsCount, activeProjects, outstandingNGN, overdueCount }
+}
+
+function computeOverdue(invoices: any[]) {
+  return invoices.filter((r: any) =>
+    r.status === 'overdue' || (r.status === 'pending' && r.due_date && r.due_date < todayStr)
+  ).slice(0, 5)
+}
+
+watch(dashboardData, (data) => {
+  if (!data) return
+  clients.value = data.clients
+  stats.value = computeStats(data)
+  upcomingMilestones.value = data.milestones
+  tasksDueToday.value = data.tasksDueToday
+  recentInvoices.value = data.recentInvoices
+  overdueInvoices.value = computeOverdue(data.invoices)
+}, { immediate: true })
+
+const handleEngagementCreated = async (result: { projectId?: string; formId?: string }) => {
+  await refreshNuxtData('dashboard')
+  if (result.projectId) {
+    navigateTo(`/projects/${result.projectId}`)
+  }
+}
+
 const filteredClients = computed(() => {
   if (!searchQuery.value) return clients.value
   const q = searchQuery.value.toLowerCase()
-  return clients.value.filter(c =>
+  return clients.value.filter((c: any) =>
     c.name.toLowerCase().includes(q) ||
     (c.website  && c.website.toLowerCase().includes(q))  ||
     (c.category && c.category.toLowerCase().includes(q))
   )
 })
-
-const today      = new Date()
-const todayStr   = today.toISOString().split('T')[0]
-const in7DaysStr = new Date(today.getTime() + 7 * 86400000).toISOString().split('T')[0]
 
 const greeting = computed(() => {
   const h = new Date().getHours()
@@ -45,84 +121,6 @@ const todayLabel = computed(() =>
   new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
 )
 
-// ── Fetch ─────────────────────────────────────────────────────────────────────
-const fetchDashboard = async () => {
-  loading.value = true
-  fetchError.value = ''
-  try {
-    const { data: clientData } = await supabase
-      .from('clients').select('*').order('created_at', { ascending: false })
-    clients.value = clientData || []
-    stats.value.totalClients = clients.value.length
-
-    const { count: projCount } = await supabase
-      .from('projects').select('*', { count: 'exact', head: true }).eq('status', 'active')
-    stats.value.activeProjects = projCount || 0
-
-    // ✅ Now fetching BOTH pending and overdue invoices
-    const { data: invoiceData } = await supabase
-      .from('retainers')
-      .select('id, title, amount, currency, status, due_date, invoice_number, clients(id, name), invoice_items(*)')
-      .in('status', ['pending', 'overdue'])   // <-- changed: includes overdue
-      .order('due_date', { ascending: true })
-    const unpaid = invoiceData || []
-
-    const getTotal = (r: any) => {
-      if (r.invoice_items?.length)
-        return r.invoice_items.reduce((s: number, i: any) => s + Number(i.quantity) * Number(i.unit_rate), 0)
-      return Number(r.amount)
-    }
-
-    // Outstanding NGN = sum of all unpaid (pending + overdue) in NGN
-    stats.value.outstandingNGN = unpaid
-      .filter(r => r.currency === 'NGN')
-      .reduce((s, r) => s + getTotal(r), 0)
-
-    // Overdue list – includes DB‑marked overdue OR pending with due date past
-    const overdue = unpaid.filter(r =>
-      r.status === 'overdue' || (r.status === 'pending' && r.due_date && r.due_date < todayStr)
-    )
-    overdueInvoices.value = overdue.slice(0, 5)
-    stats.value.overdueCount = overdue.length
-
-    // Recent invoices (unchanged – still shows latest 5 regardless of status)
-    const { data: recentInv } = await supabase
-      .from('retainers')
-      .select('id, title, amount, currency, status, due_date, invoice_number, clients(id, name), invoice_items(*)')
-      .order('created_at', { ascending: false }).limit(5)
-    recentInvoices.value = recentInv || []
-
-    const { data: milestoneData } = await supabase
-      .from('milestones')
-      .select('id, title, due_date, status, project_id, projects(id, name, clients(id, name))')
-      .gte('due_date', todayStr).lte('due_date', in7DaysStr)
-      .neq('status', 'complete').order('due_date', { ascending: true }).limit(6)
-    upcomingMilestones.value = milestoneData || []
-
-    const { data: taskData } = await supabase
-      .from('tasks')
-      .select('id, title, due_date, priority, status, project_id, milestones(id, title, projects(id, name, clients(id, name)))')
-      .lte('due_date', todayStr).neq('status', 'done')
-      .order('due_date', { ascending: true }).limit(5)
-    tasksDueToday.value = taskData || []
-
-  } catch (e: any) {
-    console.error('Dashboard fetch error:', e)
-    fetchError.value = e.message || 'Failed to load dashboard data.'
-  } finally {
-    loading.value = false
-  }
-}
-
-// ── Quick Engagement callback ─────────────────────────────────────────────────
-const handleEngagementCreated = async (result: { projectId?: string; formId?: string }) => {
-  await fetchDashboard()
-  if (result.projectId) {
-    navigateTo(`/projects/${result.projectId}`)
-  }
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 const getCategoryColor = (cat: string) => ({
   'Educational': 'text-blue-300    bg-blue-400/10    border-blue-400/20',
   'Fintech':     'text-violet-300  bg-violet-400/10  border-violet-400/20',
@@ -173,7 +171,7 @@ const invoiceStatusConfig: Record<string, { label: string; color: string; dot: s
 const effectiveInvoiceStatus = (r: any) =>
   r.status === 'pending' && r.due_date && r.due_date < todayStr ? 'overdue' : r.status
 
-const getInvoiceTotal = (r: any) => {
+const getInvoiceTotal = (r: any): number => {
   if (r.invoice_items?.length)
     return r.invoice_items.reduce((s: number, i: any) => s + Number(i.quantity) * Number(i.unit_rate), 0)
   return Number(r.amount)
@@ -190,27 +188,21 @@ const milestoneStatusDot: Record<string, string> = {
   in_progress: 'bg-blue-400',
   complete:    'bg-emerald-400',
 }
-
-onMounted(() => fetchDashboard())
 </script>
 
 <template>
   <div class="min-h-screen bg-base font-sans">
-    <!-- ===== Error banner ===== -->
     <Transition name="banner">
       <div v-if="fetchError" class="mb-6 bg-red-500/5 border border-red-500/10 rounded-xl p-4 text-sm text-red-400 flex items-start gap-3">
         <UIcon name="i-heroicons-exclamation-circle" class="w-5 h-5 shrink-0 mt-0.5" />
         <div>
           <p class="font-medium mb-1">Dashboard data could not be loaded.</p>
           <p class="text-xs opacity-80">{{ fetchError }}</p>
-          <button @click="fetchDashboard" class="mt-2 text-xs font-semibold text-primary hover:text-white transition-colors">
-            Retry
-          </button>
+          <button @click="refreshNuxtData('dashboard')" class="mt-2 text-xs font-semibold text-primary hover:text-white transition-colors">Retry</button>
         </div>
       </div>
     </Transition>
 
-    <!-- ===== Welcome Banner + Inline Stats ===== -->
     <div class="relative mb-6 rounded-2xl bg-gradient-to-r from-primary/5 to-transparent border border-white/6 p-5 md:p-6">
       <div class="flex flex-col md:flex-row justify-between md:items-center gap-3">
         <div>
@@ -231,7 +223,6 @@ onMounted(() => fetchDashboard())
         </div>
       </div>
 
-      <!-- Compact stats row (inside banner) -->
       <div class="mt-5 pt-5 border-t border-white/5 grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div class="flex items-center gap-2">
           <UIcon name="i-heroicons-users" class="w-4 h-4 text-primary" />
@@ -252,7 +243,6 @@ onMounted(() => fetchDashboard())
       </div>
     </div>
 
-    <!-- ===== Loading Skeleton ===== -->
     <div v-if="loading" class="space-y-6">
       <div class="h-20 bg-white/5 animate-pulse rounded-2xl"></div>
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -264,7 +254,6 @@ onMounted(() => fetchDashboard())
 
     <Transition name="fade" mode="out-in">
       <div v-if="!loading" key="loaded">
-        <!-- ===== Quick Actions Bar ===== -->
         <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-4 mb-6">
           <p class="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-3 px-1">Quick Actions</p>
           <div class="grid grid-cols-4 gap-2">
@@ -295,10 +284,8 @@ onMounted(() => fetchDashboard())
           </div>
         </div>
 
-        <!-- ===== Main Content: Milestones, Overdue/Tasks, Invoices ===== -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <div class="lg:col-span-2 space-y-6">
-            <!-- Upcoming Milestones -->
             <div v-if="upcomingMilestones.length" class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
               <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
                 <div class="flex items-center gap-2">
@@ -328,9 +315,7 @@ onMounted(() => fetchDashboard())
               </div>
             </div>
 
-            <!-- Overdue Invoices + Tasks Due Today -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <!-- Overdue Invoices -->
               <div v-if="overdueInvoices.length" class="bg-red-500/5 border border-red-500/10 rounded-2xl p-4">
                 <div class="flex items-center gap-2 mb-3">
                   <span class="relative flex h-2.5 w-2.5 shrink-0">
@@ -354,7 +339,6 @@ onMounted(() => fetchDashboard())
                 </div>
               </div>
 
-              <!-- Tasks Due Today -->
               <div v-if="tasksDueToday.length" class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
                 <div class="flex items-center justify-between px-4 py-3 border-b border-white/5">
                   <div class="flex items-center gap-2">
@@ -376,7 +360,6 @@ onMounted(() => fetchDashboard())
               </div>
             </div>
 
-            <!-- All caught up -->
             <div v-if="!overdueInvoices.length && !tasksDueToday.length && !upcomingMilestones.length" class="bg-white/[0.03] border border-dashed border-white/8 rounded-2xl flex flex-col items-center justify-center py-16 text-center">
               <div class="w-16 h-16 rounded-2xl bg-emerald-400/10 flex items-center justify-center mb-4">
                 <UIcon name="i-heroicons-check-badge" class="w-8 h-8 text-emerald-400" />
@@ -386,7 +369,6 @@ onMounted(() => fetchDashboard())
             </div>
           </div>
 
-          <!-- Right: Recent Invoices -->
           <div class="space-y-5">
             <div class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
               <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
@@ -422,7 +404,6 @@ onMounted(() => fetchDashboard())
           </div>
         </div>
 
-        <!-- ===== Clients Table ===== -->
         <section v-if="clients.length" class="mb-8">
           <div class="flex items-center justify-between mb-4">
             <div>
@@ -492,7 +473,6 @@ onMounted(() => fetchDashboard())
       </div>
     </Transition>
 
-    <!-- ===== Quick Engagement Modal ===== -->
     <QuickEngagementModal
       v-if="showEngagementModal"
       @close="showEngagementModal = false"
