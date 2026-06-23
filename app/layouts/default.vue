@@ -124,13 +124,13 @@ const navItems = computed<NavigationMenuItem[]>(() => [
         <NuxtLink to="/" class="flex items-center">
           <img
             v-if="!collapsed"
-            src="/img/clientbaselogo-white.png"
+            src="/img/clientbase-main-no-bg-white-light.svg"
             alt="Client Base OPS"
-            class="h-16 w-auto object-contain"
+            class="h-6 w-auto object-contain"
           />
           <img
             v-else
-            src="/img/clientbaselogo-min.png"
+            src="/img/clientbase-main-min-no-bg-light.svg"
             alt="Client Base"
             class="h-16 w-auto object-contain drop-shadow-lg"
           />
@@ -237,9 +237,9 @@ const navItems = computed<NavigationMenuItem[]>(() => [
               
               <NuxtLink to="/" class="lg:hidden flex items-center">
                 <img
-                  src="/img/clientbaselogo-white.png"
+                  src="/img/clientbase-main-no-bg-white-light.svg"
                   alt="Client Base OPS"
-                  class="h-16 w-auto object-contain"
+                  class="h-6 w-auto object-contain"
                 />
               </NuxtLink>
             </div>

@@ -47,6 +47,15 @@ const form = ref({
   template_id:  '' as string | null,
 })
 
+const fieldErrors = ref<Record<string, string>>({})
+
+const clearFieldError = (field: string) => {
+  if (fieldErrors.value[field]) {
+    delete fieldErrors.value[field]
+    fieldErrors.value = { ...fieldErrors.value }
+  }
+}
+
 const showToast = (msg: string, type = 'success') => {
   toast.value = { show: true, message: msg, type }
   setTimeout(() => toast.value.show = false, 3000)
@@ -194,19 +203,66 @@ const fetchData = async () => {
   }
 }
 
+const validateForm = (): boolean => {
+  fieldErrors.value = {}
+  let valid = true
+
+  if (!form.value.client_id) {
+    fieldErrors.value.client_id = 'Select a client'
+    valid = false
+  }
+
+  if (useLineItems.value) {
+    if (lineItems.value.every(i => !i.description.trim())) {
+      fieldErrors.value.lineItems = 'Add at least one line item with a description'
+      valid = false
+    }
+    lineItems.value.forEach((item, idx) => {
+      if (!item.description.trim()) {
+        fieldErrors.value[`line_${idx}_desc`] = 'Required'
+        valid = false
+      }
+      if (!item.quantity || item.quantity <= 0) {
+        fieldErrors.value[`line_${idx}_qty`] = 'Min 0.01'
+        valid = false
+      }
+      if (!item.unit_rate && item.unit_rate !== 0) {
+        fieldErrors.value[`line_${idx}_rate`] = 'Required'
+        valid = false
+      }
+    })
+  } else {
+    if (!form.value.amount || form.value.amount <= 0) {
+      fieldErrors.value.amount = 'Enter a valid amount'
+      valid = false
+    }
+  }
+
+  if (paymentStructure.value === 'split' && splitsTotal.value !== 100) {
+    fieldErrors.value.splits = 'Split percentages must total 100%'
+    valid = false
+  }
+
+  if (paymentStructure.value === 'recurring' && !form.value.end_date) {
+    fieldErrors.value.end_date = 'Period end is required for recurring invoices'
+    valid = false
+  }
+
+  return valid
+}
+
 const createInvoice = async () => {
-  if (!form.value.client_id) return showToast('Select a client', 'error')
-  if (useLineItems.value && lineItems.value.every(i => !i.description.trim()))
-    return showToast('Add at least one line item', 'error')
-  if (!useLineItems.value && !form.value.amount)
-    return showToast('Enter an amount', 'error')
-  if (paymentStructure.value === 'split' && splitsTotal.value !== 100)
-    return showToast('Split percentages must total 100%', 'error')
+  if (!validateForm()) return
 
   saving.value = true
   try {
     const total         = invoiceTotal.value
     const invoiceNumber = generateInvoiceNumber(retainers.value.length)
+
+    let safeEndDate = form.value.end_date || null
+    if (!safeEndDate && paymentStructure.value !== 'recurring') {
+      safeEndDate = form.value.start_date
+    }
 
     const { data: inserted, error } = await supabase
       .from('retainers')
@@ -218,7 +274,7 @@ const createInvoice = async () => {
         currency:           form.value.currency,
         status:             form.value.status,
         start_date:         form.value.start_date,
-        end_date:           form.value.end_date     || null,
+        end_date:           safeEndDate,
         due_date:           form.value.due_date     || null,
         notes:              form.value.notes        || null,
         payment_link:       form.value.payment_link || null,
@@ -227,6 +283,7 @@ const createInvoice = async () => {
         recurring_interval: paymentStructure.value === 'recurring' ? recurringInterval.value : null,
         recurring_cycles:   paymentStructure.value === 'recurring' ? recurringCycles.value   : null,
         template_id:        form.value.template_id  || null,
+        user_id:            await getUserId(),
       })
       .select()
       .single()
@@ -286,6 +343,7 @@ const resetForm = () => {
   recurringInterval.value = 'monthly'
   recurringCycles.value   = 3
   useLineItems.value      = true
+  fieldErrors.value       = {}
 }
 
 const updateStatus = async (id: string, status: string) => {
@@ -680,12 +738,19 @@ onMounted(() => fetchData())
           <div class="space-y-1.5">
             <label class="block text-xs font-semibold text-slate-400">Client <span class="text-red-400">*</span></label>
             <div class="relative">
-              <select v-model="form.client_id" required class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
+              <select
+                v-model="form.client_id"
+                required
+                class="w-full bg-white/[0.04] border rounded-xl px-4 py-3 text-sm text-white focus:outline-none appearance-none cursor-pointer transition-all duration-150"
+                :class="fieldErrors.client_id ? 'border-red-500/50' : 'border-white/8 focus:border-primary/50'"
+                @change="clearFieldError('client_id')"
+              >
                 <option class="bg-[#0d1525] text-white" value="" disabled>Choose...</option>
                 <option class="bg-[#0d1525] text-white" v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
               </select>
               <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
             </div>
+            <p v-if="fieldErrors.client_id" class="text-xs text-red-400 mt-1">{{ fieldErrors.client_id }}</p>
           </div>
           <div v-if="clientProjects.length" class="space-y-1.5">
             <label class="block text-xs font-semibold text-slate-400">Project</label>
@@ -716,13 +781,46 @@ onMounted(() => fetchData())
             <div class="col-span-3 text-right">Rate</div>
           </div>
           <div v-for="(item, idx) in lineItems" :key="idx" class="grid grid-cols-12 gap-2 items-center">
-            <input v-model="item.description" type="text" placeholder="Description" class="col-span-6 bg-white/[0.04] border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
-            <input v-model.number="item.quantity" type="number" min="0.01" step="0.01" class="col-span-2 bg-white/[0.04] border border-white/8 rounded-xl px-2 py-2.5 text-sm text-white text-center focus:border-primary/50 focus:outline-none transition-all duration-150" />
-            <input v-model.number="item.unit_rate" type="number" min="0" step="0.01" class="col-span-3 bg-white/[0.04] border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white text-right focus:border-primary/50 focus:outline-none font-mono transition-all duration-150" />
+            <div class="col-span-6">
+              <input
+                v-model="item.description"
+                type="text"
+                placeholder="Description"
+                class="w-full bg-white/[0.04] border rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none transition-all duration-150"
+                :class="fieldErrors[`line_${idx}_desc`] ? 'border-red-500/50' : 'border-white/8 focus:border-primary/50'"
+                @input="clearFieldError(`line_${idx}_desc`)"
+              />
+              <p v-if="fieldErrors[`line_${idx}_desc`]" class="text-xs text-red-400 mt-0.5">{{ fieldErrors[`line_${idx}_desc`] }}</p>
+            </div>
+            <div class="col-span-2">
+              <input
+                v-model.number="item.quantity"
+                type="number"
+                min="0.01"
+                step="0.01"
+                class="w-full bg-white/[0.04] border rounded-xl px-2 py-2.5 text-sm text-white text-center focus:outline-none transition-all duration-150"
+                :class="fieldErrors[`line_${idx}_qty`] ? 'border-red-500/50' : 'border-white/8 focus:border-primary/50'"
+                @input="clearFieldError(`line_${idx}_qty`)"
+              />
+              <p v-if="fieldErrors[`line_${idx}_qty`]" class="text-xs text-red-400 mt-0.5">{{ fieldErrors[`line_${idx}_qty`] }}</p>
+            </div>
+            <div class="col-span-3">
+              <input
+                v-model.number="item.unit_rate"
+                type="number"
+                min="0"
+                step="0.01"
+                class="w-full bg-white/[0.04] border rounded-xl px-3 py-2.5 text-sm text-white text-right focus:outline-none font-mono transition-all duration-150"
+                :class="fieldErrors[`line_${idx}_rate`] ? 'border-red-500/50' : 'border-white/8 focus:border-primary/50'"
+                @input="clearFieldError(`line_${idx}_rate`)"
+              />
+              <p v-if="fieldErrors[`line_${idx}_rate`]" class="text-xs text-red-400 mt-0.5">{{ fieldErrors[`line_${idx}_rate`] }}</p>
+            </div>
             <button type="button" @click="removeLineItem(idx)" :disabled="lineItems.length === 1" class="col-span-1 flex items-center justify-center text-slate-600 hover:text-red-400 transition-colors disabled:opacity-20">
               <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
             </button>
           </div>
+          <p v-if="fieldErrors.lineItems" class="text-xs text-red-400">{{ fieldErrors.lineItems }}</p>
           <button type="button" @click="addLineItem" class="text-xs font-semibold text-primary hover:text-white transition-colors flex items-center gap-1 mt-1">
             <UIcon name="i-heroicons-plus" class="w-3.5 h-3.5" />Add line item
           </button>
@@ -735,7 +833,16 @@ onMounted(() => fetchData())
         <div v-else class="grid grid-cols-3 gap-3">
           <div class="col-span-2 space-y-1.5">
             <label class="block text-xs font-semibold text-slate-400">Amount</label>
-            <input v-model.number="form.amount" type="number" min="0" step="0.01" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none font-mono transition-all duration-150" />
+            <input
+              v-model.number="form.amount"
+              type="number"
+              min="0"
+              step="0.01"
+              class="w-full bg-white/[0.04] border rounded-xl px-4 py-3 text-sm text-white focus:outline-none font-mono transition-all duration-150"
+              :class="fieldErrors.amount ? 'border-red-500/50' : 'border-white/8 focus:border-primary/50'"
+              @input="clearFieldError('amount')"
+            />
+            <p v-if="fieldErrors.amount" class="text-xs text-red-400 mt-1">{{ fieldErrors.amount }}</p>
           </div>
           <div class="space-y-1.5">
             <label class="block text-xs font-semibold text-slate-400">Currency</label>
@@ -748,19 +855,6 @@ onMounted(() => fetchData())
               </select>
               <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
             </div>
-          </div>
-        </div>
-
-        <div v-if="useLineItems" class="w-32 space-y-1.5">
-          <label class="block text-xs font-semibold text-slate-400">Currency</label>
-          <div class="relative">
-            <select v-model="form.currency" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer transition-all duration-150">
-              <option class="bg-[#0d1525] text-white" value="NGN">NGN</option>
-              <option class="bg-[#0d1525] text-white" value="USD">USD</option>
-              <option class="bg-[#0d1525] text-white" value="GBP">GBP</option>
-              <option class="bg-[#0d1525] text-white" value="EUR">EUR</option>
-            </select>
-            <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
           </div>
         </div>
 
@@ -792,6 +886,7 @@ onMounted(() => fetchData())
               <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
             </button>
           </div>
+          <p v-if="fieldErrors.splits" class="text-xs text-red-400">{{ fieldErrors.splits }}</p>
           <button type="button" @click="addSplit" class="text-xs font-semibold text-primary hover:text-white transition-colors flex items-center gap-1">
             <UIcon name="i-heroicons-plus" class="w-3.5 h-3.5" />Add split
           </button>
@@ -833,8 +928,19 @@ onMounted(() => fetchData())
             <input v-model="form.due_date" type="date" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-3 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
           </div>
           <div class="space-y-1.5">
-            <label class="block text-xs font-semibold text-slate-400">Period End</label>
-            <input v-model="form.end_date" type="date" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-3 py-3 text-sm text-white focus:border-primary/50 focus:outline-none transition-all duration-150" />
+            <label class="block text-xs font-semibold text-slate-400">
+              Period End
+              <span v-if="paymentStructure === 'recurring'" class="text-red-400">*</span>
+              <span v-else class="text-slate-600 font-normal">— optional</span>
+            </label>
+            <input
+              v-model="form.end_date"
+              type="date"
+              class="w-full bg-white/[0.04] border rounded-xl px-3 py-3 text-sm text-white focus:outline-none transition-all duration-150"
+              :class="fieldErrors.end_date ? 'border-red-500/50' : 'border-white/8 focus:border-primary/50'"
+              @input="clearFieldError('end_date')"
+            />
+            <p v-if="fieldErrors.end_date" class="text-xs text-red-400 mt-1">{{ fieldErrors.end_date }}</p>
           </div>
         </div>
 
@@ -872,7 +978,7 @@ onMounted(() => fetchData())
     </ModalBase>
 
     <Transition enter-active-class="transform ease-out duration-300 transition" enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2" enter-to-class="translate-y-0 opacity-100 sm:translate-x-0" leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
-      <div v-if="toast.show" class="fixed bottom-4 right-4 z-50">
+      <div v-if="toast.show" class="fixed bottom-4 right-4 z-[100]">
         <div class="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl border" :class="toast.type === 'success' ? 'bg-[#0d1525] border-emerald-500/50' : 'bg-[#0d1525] border-red-500/50'">
           <UIcon :name="toast.type === 'success' ? 'i-heroicons-check-circle' : 'i-heroicons-exclamation-circle'" class="w-5 h-5" :class="toast.type === 'success' ? 'text-emerald-400' : 'text-red-400'" />
           <span class="font-semibold text-sm text-white">{{ toast.message }}</span>

@@ -19,15 +19,18 @@ const answers     = ref<Record<string, any>>({})
 const fileUploads = ref<Record<string, File[]>>({})
 const linkInputs  = ref<Record<string, string>>({})
 const submitting  = ref(false)
+const uploadingFiles = ref(false)   // true specifically during the file upload phase
+const uploadProgress = ref<Record<string, 'idle' | 'uploading' | 'done' | 'error'>>({})
 const done        = ref(false)
 const error       = ref('')
 const agreedToTerms = ref(false)
 
 const initAnswers = (fields: any[]) => {
   fields.forEach((f: any) => {
-    answers.value[f.id]     = f.type === 'file' ? [] : ''
-    fileUploads.value[f.id] = []
-    linkInputs.value[f.id]  = ''
+    answers.value[f.id]        = f.type === 'file' ? [] : ''
+    fileUploads.value[f.id]    = []
+    linkInputs.value[f.id]     = ''
+    uploadProgress.value[f.id] = 'idle'
   })
 }
 
@@ -48,9 +51,9 @@ const groupFields = (fields: any[]) => {
     }
   }
   if (fields.length <= 5) {
-    const nonFile = fields.filter(f => f.type !== 'file')
+    const nonFile   = fields.filter(f => f.type !== 'file')
     const fileFields = fields.filter(f => f.type === 'file')
-    return [[...nonFile], fileFields.length ? [...fileFields] : []]
+    return [[...nonFile], fileFields.length ? [...fileFields] : []].filter(g => g.length)
   }
   return [contact, project, details, files].filter(g => g.length)
 }
@@ -88,7 +91,7 @@ const fetchForm = async () => {
 
     initAnswers(data.fields || [])
 
-    groups.value = groupFields(data.fields || [])
+    groups.value     = groupFields(data.fields || [])
     totalSteps.value = 2 + groups.value.length
     groupLabels.value = groups.value.map((g, idx) => {
       if (idx === 0) return 'About You'
@@ -97,23 +100,26 @@ const fetchForm = async () => {
     })
 
   } catch (e: any) {
-    error.value = e.message
+    error.value = 'Something went wrong loading this form. Please try refreshing the page.'
   } finally {
     loading.value = false
   }
 }
 
 const currentGroupIndex = computed(() => step.value - 2)
-const currentGroup = computed(() => groups.value[currentGroupIndex.value] || [])
-const isWelcomeStep = computed(() => step.value === 1)
-const isReviewStep   = computed(() => step.value === totalSteps.value - 1)
-const isDoneStep     = computed(() => step.value === totalSteps.value)
+const currentGroup      = computed(() => groups.value[currentGroupIndex.value] || [])
+const isWelcomeStep     = computed(() => step.value === 1)
+const isReviewStep      = computed(() => step.value === totalSteps.value - 1)
+const isDoneStep        = computed(() => step.value === totalSteps.value)
+
+// Clear error whenever the user moves between steps
+watch(step, () => { error.value = '' })
 
 const nextStep = () => {
   if (isWelcomeStep.value) { step.value = 2; return }
   if (isReviewStep.value) {
     if (!agreedToTerms.value) {
-      error.value = 'You must agree to the Terms of Use before submitting.'
+      error.value = 'Please agree to the Terms of Use before submitting.'
       return
     }
     handleSubmit()
@@ -130,14 +136,14 @@ const prevStep = () => {
 const validateCurrentGroup = (): boolean => {
   for (const f of currentGroup.value) {
     if (f.required) {
-      const val = answers.value[f.id]
+      const val   = answers.value[f.id]
       const files = fileUploads.value[f.id] || []
       if (f.type === 'file') {
         if (!files.length && (!Array.isArray(val) || !val.length)) {
-          error.value = `"${f.label}" is required.`
+          error.value = `"${f.label}" is required — please attach a file or paste a link.`
           return false
         }
-      } else if (!val) {
+      } else if (!val || (typeof val === 'string' && !val.trim())) {
         error.value = `"${f.label}" is required.`
         return false
       }
@@ -148,39 +154,66 @@ const validateCurrentGroup = (): boolean => {
 }
 
 const handleFileChange = (fieldId: string, event: any, maxFiles: number) => {
-  const newFiles  = Array.from(event.target.files || []) as File[]
-  const existing  = fileUploads.value[fieldId] || []
-  const combined  = [...existing, ...newFiles].slice(0, maxFiles)
+  const newFiles = Array.from(event.target.files || []) as File[]
+  const existing = fileUploads.value[fieldId] || []
+  const combined = [...existing, ...newFiles].slice(0, maxFiles)
   fileUploads.value[fieldId] = combined
+  // Reset any prior upload error state when user picks new files
+  uploadProgress.value[fieldId] = 'idle'
 }
 
 const removeFile = (fieldId: string, idx: number) => {
-  fileUploads.value[fieldId].splice(idx, 1)
+  // Replace rather than splice to maintain Vue 3 reactivity
+  const updated = [...(fileUploads.value[fieldId] || [])]
+  updated.splice(idx, 1)
+  fileUploads.value[fieldId] = updated
 }
 
 const addLink = (fieldId: string) => {
   const url = linkInputs.value[fieldId]?.trim()
   if (!url) return
   const existing = Array.isArray(answers.value[fieldId]) ? answers.value[fieldId] : []
-  answers.value[fieldId] = [...existing, url]
+  answers.value[fieldId]   = [...existing, url]
   linkInputs.value[fieldId] = ''
 }
 
+const removeLink = (fieldId: string, idx: number) => {
+  const updated = [...(answers.value[fieldId] || [])]
+  updated.splice(idx, 1)
+  answers.value[fieldId] = updated
+}
+
+// Returns the group step number for a given field, used to navigate back on error
+const stepForField = (fieldId: string): number => {
+  const idx = groups.value.findIndex(g => g.some(f => f.id === fieldId))
+  return idx === -1 ? 2 : idx + 2
+}
+
+const humanReadableError = (msg: string): string => {
+  if (!msg) return 'Something went wrong. Please try again.'
+  if (msg.includes('duplicate')) return 'This form has already been submitted.'
+  if (msg.includes('network') || msg.includes('fetch')) return 'Network error — please check your connection and try again.'
+  if (msg.includes('storage') || msg.includes('upload')) return 'One or more files failed to upload. Please try again.'
+  if (msg.length > 120) return 'Something went wrong. Please try again or contact support.'
+  return msg
+}
+
 const handleSubmit = async () => {
+  // Full re-validation before submitting
   const allFields = formData.value?.fields || []
   for (const f of allFields) {
     if (f.required) {
-      const val = answers.value[f.id]
+      const val   = answers.value[f.id]
       const files = fileUploads.value[f.id] || []
       if (f.type === 'file') {
         if (!files.length && (!Array.isArray(val) || !val.length)) {
-          error.value = `"${f.label}" is required.`
-          step.value = groups.value.findIndex(g => g.includes(f)) + 2
+          error.value = `"${f.label}" is required — please attach a file or paste a link.`
+          step.value = stepForField(f.id)
           return
         }
-      } else if (!val) {
+      } else if (!val || (typeof val === 'string' && !val.trim())) {
         error.value = `"${f.label}" is required.`
-        step.value = groups.value.findIndex(g => g.includes(f)) + 2
+        step.value = stepForField(f.id)
         return
       }
     }
@@ -190,30 +223,66 @@ const handleSubmit = async () => {
   error.value = ''
 
   try {
-    for (const f of allFields) {
-      if (f.type !== 'file') continue
-      const filesToUpload = fileUploads.value[f.id] || []
-      const uploadedUrls: string[] = []
+    // ── Phase 1: upload files ────────────────────────────────────────────────
+    const fileFields = allFields.filter((f: any) => f.type === 'file')
+    const failedUploads: string[] = []
 
-      for (const file of filesToUpload) {
-        const ext  = file.name.split('.').pop()
-        const path = `${token}/${f.id}/${Date.now()}_${file.name}`
-        const { error: upErr } = await supabase.storage
-          .from('onboarding-assets')
-          .upload(path, file)
-        if (!upErr) {
+    if (fileFields.length) {
+      uploadingFiles.value = true
+
+      for (const f of fileFields) {
+        const filesToUpload = fileUploads.value[f.id] || []
+        if (!filesToUpload.length) continue
+
+        uploadProgress.value[f.id] = 'uploading'
+        const uploadedUrls: string[] = []
+
+        for (const file of filesToUpload) {
+          const ext  = file.name.split('.').pop()
+          const path = `${token}/${f.id}/${Date.now()}_${file.name}`
+
+          const { error: upErr } = await supabase.storage
+            .from('onboarding-assets')
+            .upload(path, file)
+
+          if (upErr) {
+            // Track which field failed rather than silently skipping
+            failedUploads.push(f.label)
+            uploadProgress.value[f.id] = 'error'
+            continue
+          }
+
           const { data: urlData } = supabase.storage
             .from('onboarding-assets')
             .getPublicUrl(path)
-          uploadedUrls.push(urlData?.publicUrl || '')
+
+          if (urlData?.publicUrl) {
+            uploadedUrls.push(urlData.publicUrl)
+          }
         }
+
+        if (uploadProgress.value[f.id] !== 'error') {
+          uploadProgress.value[f.id] = 'done'
+        }
+
+        // Merge newly uploaded URLs with any pasted links
+        const pastedLinks = Array.isArray(answers.value[f.id]) ? answers.value[f.id] : []
+        answers.value[f.id] = [...uploadedUrls, ...pastedLinks].filter(Boolean)
       }
 
-      const pastedLinks = Array.isArray(answers.value[f.id]) ? answers.value[f.id] : []
-      answers.value[f.id] = [...uploadedUrls, ...pastedLinks].filter(Boolean)
+      uploadingFiles.value = false
     }
 
-    const nameFieldId  = allFields.find((f: any) => f.type === 'text' && f.label.toLowerCase().includes('name'))?.id
+    // If any file uploads failed, stop here and tell the user which ones
+    if (failedUploads.length) {
+      const fieldNames = failedUploads.join(', ')
+      error.value = `Failed to upload files for: ${fieldNames}. Please try again.`
+      submitting.value = false
+      return
+    }
+
+    // ── Phase 2: save submission ─────────────────────────────────────────────
+    const nameFieldId  = allFields.find((f: any) => f.type === 'text'  && f.label.toLowerCase().includes('name'))?.id
     const emailFieldId = allFields.find((f: any) => f.type === 'email')?.id
 
     const { error: subErr } = await supabase.from('onboarding_submissions').insert({
@@ -224,16 +293,20 @@ const handleSubmit = async () => {
     })
     if (subErr) throw subErr
 
-    await supabase
+    // Mark form as completed
+    const { error: updateErr } = await supabase
       .from('onboarding_forms')
       .update({ status: 'completed' })
       .eq('id', formData.value.id)
+    if (updateErr) throw updateErr
 
     done.value = true
+
   } catch (e: any) {
-    error.value = e.message
+    error.value = humanReadableError(e.message)
   } finally {
-    submitting.value = false
+    submitting.value  = false
+    uploadingFiles.value = false
   }
 }
 
@@ -242,8 +315,8 @@ onMounted(() => fetchForm())
 
 <template>
   <div class="min-h-screen bg-gray-50 font-sans flex flex-col">
-
     <div class="flex-1">
+
       <!-- Loading -->
       <div v-if="loading" class="flex items-center justify-center min-h-screen">
         <div class="text-center">
@@ -252,8 +325,8 @@ onMounted(() => fetchForm())
         </div>
       </div>
 
-      <!-- Error (no form) -->
-      <div v-else-if="error && !formData" class="flex items-center justify-center min-h-screen">
+      <!-- Error (no form / expired) -->
+      <div v-else-if="error && !formData" class="flex items-center justify-center min-h-screen px-4">
         <div class="text-center max-w-sm">
           <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <UIcon name="i-heroicons-exclamation-triangle" class="w-8 h-8 text-red-500" />
@@ -279,10 +352,11 @@ onMounted(() => fetchForm())
 
       <!-- Journey -->
       <div v-else-if="formData" class="max-w-2xl mx-auto px-4 py-10">
+
         <!-- Provider card -->
         <div v-if="!isDoneStep" class="flex items-center gap-4 mb-8">
-          <div class="w-12 h-12 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
-            <img v-if="provider.avatar" :src="provider.avatar" class="w-full h-full object-cover" />
+          <div class="w-12 h-12 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center shrink-0">
+            <img v-if="provider.avatar" :src="provider.avatar" class="w-full h-full object-cover" alt="Provider" />
             <UIcon v-else name="i-heroicons-building-office" class="w-6 h-6 text-gray-500" />
           </div>
           <div>
@@ -314,21 +388,22 @@ onMounted(() => fetchForm())
           </p>
           <button
             @click="nextStep"
-            class="w-full py-4 rounded-2xl font-bold text-white text-lg shadow-lg transition-all hover:opacity-90"
+            class="w-full py-4 rounded-2xl font-bold text-white text-lg shadow-lg transition-all hover:opacity-90 active:scale-[0.98]"
             :style="{ backgroundColor: provider.brandColor }"
           >
             Get Started
           </button>
         </div>
 
-        <!-- Step 2..N: Field groups -->
+        <!-- Steps 2..N: Field groups -->
         <div v-else-if="currentGroup.length" class="space-y-6">
           <div v-for="field in currentGroup" :key="field.id">
             <label class="block text-sm font-semibold text-gray-700 mb-1.5">
               {{ field.label }}
-              <span v-if="field.required" class="text-red-500">*</span>
+              <span v-if="field.required" class="text-red-500 ml-0.5">*</span>
             </label>
 
+            <!-- Textarea -->
             <textarea
               v-if="field.type === 'textarea'"
               v-model="answers[field.id]"
@@ -337,6 +412,7 @@ onMounted(() => fetchForm())
               class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--brand-color)] resize-none placeholder-gray-400 transition-all"
             ></textarea>
 
+            <!-- Select -->
             <div v-else-if="field.type === 'select'" class="relative">
               <select
                 v-model="answers[field.id]"
@@ -348,9 +424,16 @@ onMounted(() => fetchForm())
               <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
             </div>
 
+            <!-- File upload -->
             <div v-else-if="field.type === 'file'">
+              <!-- Drop zone -->
               <label
-                class="flex flex-col items-center justify-center w-full py-8 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-[var(--brand-color)] transition-colors bg-white"
+                class="flex flex-col items-center justify-center w-full py-8 border-2 border-dashed rounded-xl cursor-pointer transition-colors bg-white"
+                :class="{
+                  'border-gray-300 hover:border-[var(--brand-color)]': uploadProgress[field.id] !== 'error',
+                  'border-red-300 bg-red-50':                          uploadProgress[field.id] === 'error',
+                  'border-green-300 bg-green-50':                      uploadProgress[field.id] === 'done',
+                }"
               >
                 <input
                   type="file"
@@ -359,17 +442,38 @@ onMounted(() => fetchForm())
                   :accept="acceptString(field.acceptedTypes || [])"
                   @change="handleFileChange(field.id, $event, field.maxFiles || 1)"
                 />
-                <UIcon name="i-heroicons-paper-clip" class="w-6 h-6 text-gray-400 mb-2" />
-                <p class="text-sm text-gray-600 font-medium">
-                  {{ (fileUploads[field.id] || []).length > 0
-                    ? `${fileUploads[field.id].length} file(s) selected`
-                    : `Click to attach file${(field.maxFiles || 1) > 1 ? 's' : ''}` }}
-                </p>
-                <p class="text-xs text-gray-400 mt-1">
-                  Max {{ field.maxFiles || 1 }} file{{ (field.maxFiles || 1) !== 1 ? 's' : '' }}
-                  <span v-if="field.acceptedTypes?.length">· {{ field.acceptedTypes.join(', ') }}</span>
-                </p>
+                <!-- Uploading state -->
+                <template v-if="uploadProgress[field.id] === 'uploading'">
+                  <div class="w-6 h-6 border-2 border-gray-300 rounded-full animate-spin mb-2"
+                       :style="{ borderTopColor: provider.brandColor }"></div>
+                  <p class="text-sm text-gray-500 font-medium">Uploading...</p>
+                </template>
+                <!-- Error state -->
+                <template v-else-if="uploadProgress[field.id] === 'error'">
+                  <UIcon name="i-heroicons-exclamation-circle" class="w-6 h-6 text-red-400 mb-2" />
+                  <p class="text-sm text-red-600 font-medium">Upload failed — click to retry</p>
+                </template>
+                <!-- Done state -->
+                <template v-else-if="uploadProgress[field.id] === 'done'">
+                  <UIcon name="i-heroicons-check-circle" class="w-6 h-6 text-green-500 mb-2" />
+                  <p class="text-sm text-green-600 font-medium">{{ (fileUploads[field.id] || []).length }} file(s) uploaded</p>
+                </template>
+                <!-- Idle/default state -->
+                <template v-else>
+                  <UIcon name="i-heroicons-paper-clip" class="w-6 h-6 text-gray-400 mb-2" />
+                  <p class="text-sm text-gray-600 font-medium">
+                    {{ (fileUploads[field.id] || []).length > 0
+                      ? `${fileUploads[field.id].length} file(s) selected`
+                      : `Click to attach file${(field.maxFiles || 1) > 1 ? 's' : ''}` }}
+                  </p>
+                  <p class="text-xs text-gray-400 mt-1">
+                    Max {{ field.maxFiles || 1 }} file{{ (field.maxFiles || 1) !== 1 ? 's' : '' }}
+                    <span v-if="field.acceptedTypes?.length"> · {{ field.acceptedTypes.join(', ') }}</span>
+                  </p>
+                </template>
               </label>
+
+              <!-- Selected file list -->
               <div v-if="(fileUploads[field.id] || []).length" class="mt-3 space-y-2">
                 <div
                   v-for="(file, idx) in fileUploads[field.id]"
@@ -380,11 +484,19 @@ onMounted(() => fetchForm())
                     <UIcon name="i-heroicons-document" class="w-4 h-4 text-gray-400 shrink-0" />
                     <p class="text-sm text-gray-700 truncate">{{ file.name }}</p>
                   </div>
-                  <button @click="removeFile(field.id, idx)" class="text-gray-400 hover:text-red-500">
+                  <!-- Only allow removal if not mid-upload -->
+                  <button
+                    v-if="uploadProgress[field.id] !== 'uploading'"
+                    @click="removeFile(field.id, idx)"
+                    class="text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                    title="Remove file"
+                  >
                     <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
                   </button>
                 </div>
               </div>
+
+              <!-- Pasted link input -->
               <div class="mt-3">
                 <p class="text-xs text-gray-400 mb-1">Or paste a Google Drive / Dropbox link:</p>
                 <div class="flex gap-2">
@@ -398,15 +510,37 @@ onMounted(() => fetchForm())
                   <button
                     v-if="linkInputs[field.id]"
                     @click="addLink(field.id)"
-                    class="px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all"
+                    class="px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
                     :style="{ backgroundColor: provider.brandColor }"
                   >
                     Add
                   </button>
                 </div>
               </div>
+
+              <!-- Added links list -->
+              <div v-if="Array.isArray(answers[field.id]) && answers[field.id].length" class="mt-3 space-y-2">
+                <div
+                  v-for="(url, idx) in answers[field.id]"
+                  :key="idx"
+                  class="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-3 py-2"
+                >
+                  <div class="flex items-center gap-2 min-w-0">
+                    <UIcon name="i-heroicons-link" class="w-4 h-4 text-blue-400 shrink-0" />
+                    <p class="text-sm text-blue-700 truncate">{{ url }}</p>
+                  </div>
+                  <button
+                    @click="removeLink(field.id, idx)"
+                    class="text-blue-300 hover:text-red-500 transition-colors shrink-0"
+                    title="Remove link"
+                  >
+                    <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </div>
 
+            <!-- Default input (text, email, url, number, etc.) -->
             <input
               v-else
               v-model="answers[field.id]"
@@ -416,24 +550,43 @@ onMounted(() => fetchForm())
             />
           </div>
 
-          <div v-if="error" class="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
-            {{ error }}
+          <!-- Step-level error -->
+          <div v-if="error" class="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
+            <UIcon name="i-heroicons-exclamation-circle" class="w-5 h-5 shrink-0 mt-0.5" />
+            <span>{{ error }}</span>
           </div>
         </div>
 
         <!-- Review step -->
         <div v-else-if="isReviewStep" class="space-y-6">
-          <h2 class="text-xl font-bold text-gray-900">Review Your Brief</h2>
-          <p class="text-gray-500 text-sm">Double-check everything before submitting.</p>
+          <div>
+            <h2 class="text-xl font-bold text-gray-900">Review Your Brief</h2>
+            <p class="text-gray-500 text-sm mt-1">Double-check everything before submitting.</p>
+          </div>
+
           <div
             v-for="field in (formData.fields || [])"
             :key="field.id"
             class="bg-white rounded-xl border border-gray-200 p-4"
           >
-            <p class="text-xs font-semibold text-gray-500 uppercase mb-1">{{ field.label }}</p>
-            <p class="text-gray-800 text-sm whitespace-pre-wrap">{{ answers[field.id] || '—' }}</p>
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{{ field.label }}</p>
+            <!-- File field review -->
+            <template v-if="field.type === 'file'">
+              <div v-if="(fileUploads[field.id] || []).length || (Array.isArray(answers[field.id]) && answers[field.id].length)" class="space-y-1 mt-1">
+                <div v-for="(f, i) in (fileUploads[field.id] || [])" :key="'f' + i" class="flex items-center gap-2 text-sm text-gray-700">
+                  <UIcon name="i-heroicons-document" class="w-4 h-4 text-gray-400 shrink-0" />
+                  <span class="truncate">{{ f.name }}</span>
+                </div>
+                <div v-for="(url, i) in (Array.isArray(answers[field.id]) ? answers[field.id] : [])" :key="'l' + i" class="flex items-center gap-2 text-sm text-blue-600">
+                  <UIcon name="i-heroicons-link" class="w-4 h-4 shrink-0" />
+                  <span class="truncate">{{ url }}</span>
+                </div>
+              </div>
+              <p v-else class="text-gray-400 text-sm italic">No files attached</p>
+            </template>
+            <p v-else class="text-gray-800 text-sm whitespace-pre-wrap mt-1">{{ answers[field.id] || '—' }}</p>
             <button
-              @click="step = groups.findIndex(g => g.includes(field)) + 2"
+              @click="step = stepForField(field.id)"
               class="text-xs font-medium mt-2 hover:underline"
               :style="{ color: provider.brandColor }"
             >
@@ -441,43 +594,55 @@ onMounted(() => fetchForm())
             </button>
           </div>
 
-          <!-- Terms of use checkbox -->
+          <!-- Terms checkbox -->
           <div class="bg-white rounded-xl border border-gray-200 p-4 flex items-start gap-3">
             <input
-              type="checkbox"
               id="terms"
               v-model="agreedToTerms"
+              type="checkbox"
               class="mt-0.5 w-4 h-4 rounded border-gray-300 text-[var(--brand-color)] focus:ring-[var(--brand-color)]"
             />
-            <div>
-              <label for="terms" class="text-sm text-gray-700">
-                I agree to the <a href="/terms" target="_blank" class="underline" :style="{ color: provider.brandColor }">Terms of Use</a> and understand that my responses will be shared with {{ provider.organization || provider.name }}.
-              </label>
-            </div>
+            <label for="terms" class="text-sm text-gray-700 cursor-pointer">
+              I agree to the
+              <a href="/terms" target="_blank" class="underline" :style="{ color: provider.brandColor }">Terms of Use</a>
+              and understand that my responses will be shared with {{ provider.organization || provider.name }}.
+            </label>
           </div>
 
-          <div v-if="error" class="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{{ error }}</div>
+          <!-- Upload progress summary (shown during submission) -->
+          <div v-if="uploadingFiles" class="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700">
+            <div class="w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin shrink-0"></div>
+            <span>Uploading your files, please wait...</span>
+          </div>
+
+          <!-- Review-level error -->
+          <div v-if="error" class="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
+            <UIcon name="i-heroicons-exclamation-circle" class="w-5 h-5 shrink-0 mt-0.5" />
+            <span>{{ error }}</span>
+          </div>
         </div>
 
         <!-- Navigation -->
         <div v-if="!isWelcomeStep && !isDoneStep" class="mt-10 flex gap-3">
           <button
             @click="prevStep"
-            class="px-5 py-3 rounded-xl text-sm font-semibold bg-gray-100 hover:bg-gray-200 text-gray-600 transition-all"
+            :disabled="submitting"
+            class="px-5 py-3 rounded-xl text-sm font-semibold bg-gray-100 hover:bg-gray-200 text-gray-600 transition-all disabled:opacity-50"
           >
             Back
           </button>
           <button
             @click="nextStep"
             :disabled="submitting"
-            class="flex-1 py-3 rounded-xl font-bold text-white transition-all hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+            class="flex-1 py-3 rounded-xl font-bold text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
             :style="{ backgroundColor: provider.brandColor }"
           >
             <div v-if="submitting" class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
             <span v-if="isReviewStep">{{ submitting ? 'Submitting...' : 'Confirm & Submit' }}</span>
-            <span v-else>{{ submitting ? 'Submitting...' : 'Continue' }}</span>
+            <span v-else>Continue</span>
           </button>
         </div>
+
       </div>
     </div>
 
@@ -487,11 +652,11 @@ onMounted(() => fetchForm())
         <div class="flex items-center gap-2">
           <span>Powered by</span>
           <a href="/" target="_blank" class="hover:opacity-80 transition-opacity">
-            <img src="/img/clientbaselogo.png" alt="ClientBase" class="h-16 w-auto" />
+            <img src="/img/clientbase-main.svg" alt="ClientBase" class="h-8 w-auto" />
           </a>
         </div>
         <div>
-          <a href="/terms" target="_blank" class="hover:text-gray-500 transition-colors">Terms of Use</a>
+          <a href="/terms"   target="_blank" class="hover:text-gray-500 transition-colors">Terms of Use</a>
           <span class="mx-2">·</span>
           <a href="/privacy" target="_blank" class="hover:text-gray-500 transition-colors">Privacy Policy</a>
         </div>

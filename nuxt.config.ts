@@ -8,7 +8,8 @@ export default defineNuxtConfig({
     '@nuxt/ui',
     '@nuxt/hints',
     '@pinia/nuxt',
-    '@nuxtjs/supabase'
+    '@nuxtjs/supabase',
+    'nuxt-seo-utils',
   ],
   ui: {
     colorMode: false
@@ -52,9 +53,14 @@ export default defineNuxtConfig({
   },
   runtimeConfig:{
     secretsEncryptionKey: process.env.SECRETS_ENCRYPTION_KEY,
+        b2AppKey: process.env.B2_APP_KEY,
+    b2BucketName: process.env.B2_BUCKET_NAME,
+    b2Endpoint: process.env.B2_ENDPOINT,
+    b2Region: process.env.B2_REGION,
     public: {
       CloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME,
-      CloudinaryPreset: process.env.CLOUDINARY_PRESET
+      CloudinaryPreset: process.env.CLOUDINARY_PRESET,
+      b2KeyId: process.env.B2_KEY_ID,
     }
   },
   nitro: {

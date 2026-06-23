@@ -324,7 +324,7 @@ const handleCreate = async () => {
         <Transition name="tab-fade" mode="out-in">
           <div v-if="mode === 'prompt'" key="prompt" class="space-y-2">
             <label class="block text-xs font-semibold text-slate-400">What do you need to set up?</label>
-            <textarea v-model="promptText" rows="4" placeholder="e.g., Build a website for Acme Corp, ₦500k, due July 30" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none" />
+            <textarea v-model="promptText" rows="4" placeholder="e.g., Build a website for Acme Corp, ₦500k, due July 30" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none" />
             <p class="text-[10px] text-slate-500">The fields below will update automatically.</p>
           </div>
 
@@ -335,7 +335,7 @@ const handleCreate = async () => {
               <p class="text-sm text-white font-semibold">Upload Markdown file</p>
               <p class="text-xs text-slate-500 mt-1">Or paste below</p>
             </div>
-            <textarea v-model="markdownText" placeholder="Paste markdown here…" rows="4" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none" @input="parseMarkdown(markdownText)" />
+            <textarea v-model="markdownText" placeholder="Paste markdown here…" rows="4" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none" @input="parseMarkdown(markdownText)" />
             <button
               type="button"
               @click="showClaudeSkill = !showClaudeSkill"
@@ -343,7 +343,7 @@ const handleCreate = async () => {
             >
               Need a Claude Skill to generate this file?
             </button>
-            <div v-if="showClaudeSkill" class="bg-white/[0.02] border border-white/6 rounded-xl p-4">
+            <div v-if="showClaudeSkill" class="bg-white/2 border border-white/6 rounded-xl p-4">
               <p class="text-xs text-slate-400 mb-2">Copy the markdown below and save as <code>SKILL.md</code> in your Claude skills folder.</p>
               <pre class="text-xs text-slate-500 whitespace-pre-wrap max-h-40 overflow-y-auto">{{ CLAUDE_SKILL_MD }}</pre>
               <button @click="copyClaudePrompt" class="mt-3 w-full py-2 rounded-lg bg-white/5 hover:bg-white/8 border border-white/6 text-xs font-semibold text-slate-400 hover:text-white transition-all">
@@ -365,17 +365,17 @@ const handleCreate = async () => {
             <div v-if="!props.clientId" class="space-y-3">
               <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Client</p>
               <div>
-                <input v-model="editable.client_name" placeholder="Client name *" class="w-full bg-white/[0.04] border rounded-xl px-4 py-3 text-sm text-white focus:outline-none" :class="fieldErrors.client_name ? 'border-red-500/50' : 'border-white/8 focus:border-primary/50'" />
+                <input v-model="editable.client_name" placeholder="Client name *" class="w-full bg-white/4 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none" :class="fieldErrors.client_name ? 'border-red-500/50' : 'border-white/8 focus:border-primary/50'" />
                 <p v-if="fieldErrors.client_name" class="text-xs text-red-400 mt-1">{{ fieldErrors.client_name }}</p>
               </div>
               <div>
-                <input v-model="editable.contact_email" placeholder="Contact email (optional)" type="email" class="w-full bg-white/[0.04] border rounded-xl px-4 py-3 text-sm text-white focus:outline-none" :class="fieldErrors.contact_email ? 'border-red-500/50' : 'border-white/8 focus:border-primary/50'" />
+                <input v-model="editable.contact_email" placeholder="Contact email (optional)" type="email" class="w-full bg-white/4 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none" :class="fieldErrors.contact_email ? 'border-red-500/50' : 'border-white/8 focus:border-primary/50'" />
                 <p v-if="fieldErrors.contact_email" class="text-xs text-red-400 mt-1">{{ fieldErrors.contact_email }}</p>
               </div>
-              <input v-model="editable.contact_phone" placeholder="Contact phone (optional)" type="tel" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none" />
-              <input v-model="editable.client_website" placeholder="Website (optional)" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none" />
+              <input v-model="editable.contact_phone" placeholder="Contact phone (optional)" type="tel" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none" />
+              <input v-model="editable.client_website" placeholder="Website (optional)" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none" />
               <div class="relative">
-                <select v-model="editable.client_category" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer">
+                <select v-model="editable.client_category" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer">
                   <option v-for="cat in categories" :key="cat" :value="cat" class="bg-[#0d1525] text-white">{{ cat }}</option>
                 </select>
                 <UIcon name="i-heroicons-chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
@@ -384,7 +384,7 @@ const handleCreate = async () => {
                 <p class="text-xs font-semibold text-slate-400 mb-1.5">Logo (optional)</p>
                 <div class="flex items-center gap-3">
                   <div class="relative group cursor-pointer shrink-0">
-                    <div class="w-12 h-12 rounded-xl bg-white/[0.04] border border-white/8 flex items-center justify-center overflow-hidden">
+                    <div class="w-12 h-12 rounded-xl bg-white/4 border border-white/8 flex items-center justify-center overflow-hidden">
                       <img v-if="logoPreview" :src="logoPreview" class="w-full h-full object-cover" />
                       <UIcon v-else name="i-heroicons-photo" class="w-5 h-5 text-slate-500" />
                     </div>
@@ -401,10 +401,10 @@ const handleCreate = async () => {
               <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-3">Project</p>
               <div class="space-y-3">
                 <div>
-                  <input v-model="editable.project_name" placeholder="Project name *" class="w-full bg-white/[0.04] border rounded-xl px-4 py-3 text-sm text-white focus:outline-none" :class="fieldErrors.project_name ? 'border-red-500/50' : 'border-white/8 focus:border-primary/50'" />
+                  <input v-model="editable.project_name" placeholder="Project name *" class="w-full bg-white/4 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none" :class="fieldErrors.project_name ? 'border-red-500/50' : 'border-white/8 focus:border-primary/50'" />
                   <p v-if="fieldErrors.project_name" class="text-xs text-red-400 mt-1">{{ fieldErrors.project_name }}</p>
                 </div>
-                <textarea v-model="editable.project_description" placeholder="Description (optional)" rows="2" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none" />
+                <textarea v-model="editable.project_description" placeholder="Description (optional)" rows="2" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none resize-none" />
                 <div class="flex gap-2">
                   <div class="relative flex-1">
                     <select v-model="editable.project_currency" class="absolute left-3 top-1/2 -translate-y-1/2 bg-transparent text-xs font-semibold text-slate-400 focus:outline-none appearance-none cursor-pointer w-12 z-10">
@@ -413,12 +413,12 @@ const handleCreate = async () => {
                       <option value="GBP" class="bg-[#0d1525] text-white">GBP</option>
                       <option value="EUR" class="bg-[#0d1525] text-white">EUR</option>
                     </select>
-                    <input v-model.number="editable.project_budget" type="number" placeholder="Budget" class="w-full bg-white/[0.04] border border-white/8 rounded-xl pl-14 pr-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none" />
+                    <input v-model.number="editable.project_budget" type="number" placeholder="Budget" class="w-full bg-white/4 border border-white/8 rounded-xl pl-14 pr-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none" />
                   </div>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
-                  <input v-model="editable.project_start_date" type="date" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none" />
-                  <input v-model="editable.project_end_date" type="date" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none" />
+                  <input v-model="editable.project_start_date" type="date" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none" />
+                  <input v-model="editable.project_end_date" type="date" class="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none" />
                 </div>
               </div>
             </div>

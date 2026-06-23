@@ -67,9 +67,12 @@ const copiedShareLink = ref(false)
 
 // Delete confirmation modals
 const showDeleteProjectConfirm = ref(false)
-const showDeleteSecretConfirm = ref(false)
-const deletingSecretId = ref<string | null>(null)
-const showRevokeShareConfirm = ref(false)
+const showDeleteSecretConfirm  = ref(false)
+const deletingSecretId         = ref<string | null>(null)
+const showRevokeShareConfirm   = ref(false)
+const showDeleteFileConfirm    = ref(false)
+const deletingFileId           = ref<string | null>(null)
+const isDeletingFile           = ref(false)
 
 const generateShareLink = async () => {
   if (shareToken.value) return
@@ -132,7 +135,7 @@ const fetchData = async () => {
     projectData.value = pData
     clientData.value  = pData?.clients
     notesDraft.value  = pData?.notes || ''
-    shareToken.value = pData?.share_token || null
+    shareToken.value  = pData?.share_token || null
     editForm.value = {
       name:        pData?.name        || '',
       description: pData?.description || '',
@@ -144,10 +147,14 @@ const fetchData = async () => {
     }
     const sData = await $fetch('/api/secrets', { query: { project_id: projectId.value } })
     secrets.value = sData?.map((s) => ({ ...s, isRevealed: false })) || []
+
     const { data: fData } = await supabase
-      .from('files').select('*').eq('project_id', projectId.value)
+      .from('files')
+      .select('*')
+      .eq('project_id', projectId.value)
       .order('created_at', { ascending: false })
     files.value = fData || []
+
     if (pData?.onboarding_submission_id) {
       const { data: subData } = await supabase
         .from('onboarding_submissions')
@@ -170,13 +177,13 @@ const saveEdit = async () => {
   savingEdit.value = true
   try {
     const { error } = await supabase.from('projects').update({
-      name: editForm.value.name,
+      name:        editForm.value.name,
       description: editForm.value.description || null,
-      status: editForm.value.status,
-      start_date: editForm.value.start_date  || null,
-      end_date: editForm.value.end_date    || null,
-      budget: editForm.value.budget ? parseFloat(editForm.value.budget) : null,
-      currency: editForm.value.currency,
+      status:      editForm.value.status,
+      start_date:  editForm.value.start_date  || null,
+      end_date:    editForm.value.end_date    || null,
+      budget:      editForm.value.budget ? parseFloat(editForm.value.budget) : null,
+      currency:    editForm.value.currency,
       updated_at:  new Date().toISOString(),
     }).eq('id', projectId.value)
     if (error) throw error
@@ -195,7 +202,7 @@ const saveNotes = async () => {
   savingNotes.value = true
   try {
     const { error } = await supabase.from('projects').update({
-      notes: notesDraft.value,
+      notes:      notesDraft.value,
       updated_at: new Date().toISOString()
     }).eq('id', projectId.value)
     if (error) throw error
@@ -220,7 +227,13 @@ const addSecret = async () => {
   try {
     await $fetch('/api/secrets', {
       method: 'POST',
-      body: { user_id: user.value.sub, client_id: clientData.value?.id || null, project_id: projectId.value, key_name: newSecret.value.name, value: newSecret.value.value }
+      body: {
+        user_id:    user.value.sub,
+        client_id:  clientData.value?.id || null,
+        project_id: projectId.value,
+        key_name:   newSecret.value.name,
+        value:      newSecret.value.value,
+      }
     })
     showSecretModal.value = false
     newSecret.value = { name: '', value: '' }
@@ -257,43 +270,80 @@ const copyToClipboard = (text, id) => {
   setTimeout(() => (copiedSecretId.value = null), 2000)
 }
 
+// ─── B2 File Handlers ───────────────────────────────────────────────────────
+
 const handleFileUpload = async (event) => {
   if (!projectId.value) return
   const file = event.target.files[0]
   if (!file) return
   uploading.value = true
   try {
-    const ext = file.name.split('.').pop()
-    const fileName = `${crypto.randomUUID()}.${ext}`
-    const filePath = `${user.value?.id}/${projectId.value}/${fileName}`
-    const { error: uploadError } = await supabase.storage.from('project_files').upload(filePath, file)
-    if (uploadError) throw uploadError
-    const { error: dbError } = await supabase.from('files').insert({
-      project_id: projectId.value, file_name: file.name, file_path: filePath, file_type: file.type, client_id: clientData.value?.id || null,
+    const form = new FormData()
+    form.append('file', file)
+    form.append('projectId', projectId.value)
+    form.append('clientId', clientData.value?.id || '')
+
+    await $fetch('/api/files/upload', {
+      method: 'POST',
+      body: form,
     })
-    if (dbError) throw dbError
+
     showToast('File uploaded')
     await fetchData()
   } catch (e: any) {
     showToast(e.message, 'error')
   } finally {
     uploading.value = false
+    // Reset the input so the same file can be re-uploaded if needed
+    event.target.value = ''
   }
 }
 
-const downloadFile = async (path) => {
-  const { data } = await supabase.storage.from('project_files').createSignedUrl(path, 60)
-  if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+const downloadFile = async (fileId: string) => {
+  try {
+    const { signedUrl } = await $fetch('/api/files/download', {
+      query: { fileId }
+    })
+    window.open(signedUrl, '_blank')
+  } catch (e: any) {
+    showToast('Could not generate download link', 'error')
+  }
+}
+
+const requestDeleteFile = (id: string) => {
+  deletingFileId.value = id
+  showDeleteFileConfirm.value = true
+}
+
+const confirmDeleteFile = async () => {
+  if (!deletingFileId.value) return
+  isDeletingFile.value = true
+  try {
+    await $fetch('/api/files/delete', {
+      method: 'DELETE',
+      query: { fileId: deletingFileId.value }
+    })
+    showToast('File deleted')
+    showDeleteFileConfirm.value = false
+    deletingFileId.value = null
+    await fetchData()
+  } catch (e: any) {
+    showToast(e.message, 'error')
+  } finally {
+    isDeletingFile.value = false
+  }
 }
 
 const deleteProject = async () => {
   if (!projectId.value) return
   isDeleting.value = true
   try {
-    const { data: filesToDelete } = await supabase.from('files').select('file_path').eq('project_id', projectId.value)
-    if (filesToDelete?.length) {
-      await supabase.storage.from('project_files').remove(filesToDelete.map((f) => f.file_path))
-    }
+    // Delete all project files from B2 and their DB records
+    await $fetch('/api/files/delete-project-files', {
+      method: 'DELETE',
+      query: { projectId: projectId.value }
+    })
+    // Then delete the project record itself
     await supabase.from('projects').delete().eq('id', projectId.value)
     showDeleteProjectConfirm.value = false
     return navigateTo(clientData.value ? `/clients/${clientData.value.id}` : '/')
@@ -304,9 +354,15 @@ const deleteProject = async () => {
   }
 }
 
+// ─── Reminders ──────────────────────────────────────────────────────────────
+
 const fetchReminderConfig = async () => {
   try {
-    const { data } = await supabase.from('invoice_reminder_configs').select('*').eq('project_id', projectId.value).single()
+    const { data } = await supabase
+      .from('invoice_reminder_configs')
+      .select('*')
+      .eq('project_id', projectId.value)
+      .single()
     if (data) reminderConfig.value = data
   } catch (e: any) {
     showToast('Failed to load reminder config', 'error')
@@ -317,12 +373,12 @@ const saveReminderConfig = async () => {
   savingReminder.value = true
   try {
     const { error } = await supabase.from('invoice_reminder_configs').upsert({
-      project_id: projectId.value,
-      enabled: reminderConfig.value.enabled,
-      frequency: reminderConfig.value.frequency,
+      project_id:     projectId.value,
+      enabled:        reminderConfig.value.enabled,
+      frequency:      reminderConfig.value.frequency,
       custom_message: reminderConfig.value.custom_message,
       recipient_email: reminderConfig.value.recipient_email || null,
-      updated_at: new Date().toISOString(),
+      updated_at:     new Date().toISOString(),
     }, { onConflict: 'project_id' })
     if (error) throw error
     showToast('Reminder settings saved!')
@@ -336,7 +392,12 @@ const saveReminderConfig = async () => {
 const fetchReminderLogs = async () => {
   loadingLogs.value = true
   try {
-    const { data } = await supabase.from('invoice_reminder_logs').select('*').eq('project_id', projectId.value).order('sent_at', { ascending: false }).limit(20)
+    const { data } = await supabase
+      .from('invoice_reminder_logs')
+      .select('*')
+      .eq('project_id', projectId.value)
+      .order('sent_at', { ascending: false })
+      .limit(20)
     reminderLogs.value = data || []
   } catch (e: any) {
     showToast('Failed to load reminder logs', 'error')
@@ -349,7 +410,13 @@ const sendTestEmail = async () => {
   testEmailSending.value = true
   testEmailResult.value = ''
   try {
-    await $fetch('/api/send-test-reminder', { method: 'POST', body: { project_id: projectId.value, recipient_email: reminderConfig.value.recipient_email } })
+    await $fetch('/api/send-test-reminder', {
+      method: 'POST',
+      body: {
+        project_id:      projectId.value,
+        recipient_email: reminderConfig.value.recipient_email,
+      }
+    })
     testEmailResult.value = 'sent'
     showToast('Test email sent! Check your inbox.')
   } catch (e: any) {
@@ -360,13 +427,15 @@ const sendTestEmail = async () => {
   }
 }
 
+// ─── UI Helpers ─────────────────────────────────────────────────────────────
+
 const statusConfig: Record<string, { label: string; dot: string; badge: string }> = {
-  lead:     { label: 'Lead',     dot: 'bg-slate-400',   badge: 'text-slate-300  bg-slate-400/10  border-slate-400/20'  },
-  proposal: { label: 'Proposal', dot: 'bg-blue-400',    badge: 'text-blue-300   bg-blue-400/10   border-blue-400/20'   },
+  lead:     { label: 'Lead',     dot: 'bg-slate-400',   badge: 'text-slate-300   bg-slate-400/10  border-slate-400/20'   },
+  proposal: { label: 'Proposal', dot: 'bg-blue-400',    badge: 'text-blue-300    bg-blue-400/10   border-blue-400/20'    },
   active:   { label: 'Active',   dot: 'bg-emerald-400', badge: 'text-emerald-300 bg-emerald-400/10 border-emerald-400/20' },
-  review:   { label: 'Review',   dot: 'bg-amber-400',   badge: 'text-amber-300  bg-amber-400/10  border-amber-400/20'  },
-  complete: { label: 'Complete', dot: 'bg-violet-400',  badge: 'text-violet-300 bg-violet-400/10 border-violet-400/20' },
-  archived: { label: 'Archived', dot: 'bg-slate-600',   badge: 'text-slate-500  bg-slate-600/10  border-slate-600/20'  },
+  review:   { label: 'Review',   dot: 'bg-amber-400',   badge: 'text-amber-300   bg-amber-400/10  border-amber-400/20'   },
+  complete: { label: 'Complete', dot: 'bg-violet-400',  badge: 'text-violet-300  bg-violet-400/10 border-violet-400/20'  },
+  archived: { label: 'Archived', dot: 'bg-slate-600',   badge: 'text-slate-500   bg-slate-600/10  border-slate-600/20'   },
 }
 
 const formatBudget = (amount: number, currency: string) =>
@@ -387,13 +456,15 @@ function onResize() { isSmallScreen.value = window.innerWidth < 640 }
 onMounted(() => { onResize(); window.addEventListener('resize', onResize) })
 onUnmounted(() => window.removeEventListener('resize', onResize))
 
-const mobilePriorityKeys = ['secrets', 'notes', 'files', 'milestones']
+const mobilePriorityKeys  = ['secrets', 'notes', 'files', 'milestones']
 const desktopPriorityKeys = ['secrets', 'notes', 'files', 'milestones', 'calendar']
 const visiblePriorityTabs = computed(() => {
   const keys = isSmallScreen.value ? mobilePriorityKeys : desktopPriorityKeys
   return tabs.filter(t => keys.includes(t.key))
 })
-const overflowTabs = computed(() => tabs.filter(t => !visiblePriorityTabs.value.map(v => v.key).includes(t.key)))
+const overflowTabs = computed(() =>
+  tabs.filter(t => !visiblePriorityTabs.value.map(v => v.key).includes(t.key))
+)
 const showOverflow = ref(false)
 
 const switchTab = (key: string) => {
@@ -590,9 +661,10 @@ onMounted(() => fetchData())
         </div>
       </div>
 
-      <!-- Tab Content with transitions -->
+      <!-- Tab Content -->
       <div class="min-h-[400px]">
         <Transition name="tab-fade" mode="out-in">
+
           <!-- Secrets -->
           <div v-if="activeTab === 'secrets'" key="secrets" class="space-y-5">
             <div class="flex items-center justify-between">
@@ -604,7 +676,6 @@ onMounted(() => fetchData())
                 <UIcon name="i-heroicons-plus" class="w-4 h-4" /> Add Secret
               </button>
             </div>
-
             <div class="bg-white/[0.03] border border-white/6 rounded-2xl overflow-hidden">
               <div v-if="secrets.length === 0" class="p-16 text-center">
                 <div class="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
@@ -659,7 +730,7 @@ onMounted(() => fetchData())
                 <template v-else>
                   <div class="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/6">
                     <button @click="isPreviewMode = false" :class="!isPreviewMode ? 'bg-primary text-white' : 'text-slate-400 hover:text-white'" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all">Write</button>
-                    <button @click="isPreviewMode = true" :class="isPreviewMode ? 'bg-primary text-white' : 'text-slate-400 hover:text-white'" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all">Preview</button>
+                    <button @click="isPreviewMode = true"  :class="isPreviewMode  ? 'bg-primary text-white' : 'text-slate-400 hover:text-white'" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all">Preview</button>
                   </div>
                   <button @click="isEditingNotes = false" class="px-3 py-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors">Cancel</button>
                   <button @click="saveNotes" :disabled="savingNotes" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-[0.98] disabled:opacity-50">
@@ -710,7 +781,11 @@ onMounted(() => fetchData())
               </div>
             </div>
             <div v-if="files.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div v-for="f in files" :key="f.id" class="flex items-center justify-between bg-white/[0.03] border border-white/6 rounded-2xl p-4 hover:bg-white/[0.05] hover:border-white/10 transition-all group">
+              <div
+                v-for="f in files"
+                :key="f.id"
+                class="flex items-center justify-between bg-white/[0.03] border border-white/6 rounded-2xl p-4 hover:bg-white/[0.05] hover:border-white/10 transition-all group"
+              >
                 <div class="flex items-center gap-4 overflow-hidden">
                   <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                     <UIcon name="i-heroicons-document-text" class="w-5 h-5 text-primary" />
@@ -720,9 +795,23 @@ onMounted(() => fetchData())
                     <p class="text-[10px] text-slate-500 mt-0.5">{{ new Date(f.created_at).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }) }}</p>
                   </div>
                 </div>
-                <button @click="downloadFile(f.file_path)" class="p-2 rounded-xl hover:bg-white/8 text-slate-400 hover:text-white transition-colors shrink-0">
-                  <UIcon name="i-heroicons-arrow-down-tray" class="w-5 h-5" />
-                </button>
+                <!-- Download + Delete actions -->
+                <div class="flex items-center gap-1 shrink-0">
+                  <button
+                    @click="downloadFile(f.id)"
+                    class="p-2 rounded-xl hover:bg-white/8 text-slate-400 hover:text-white transition-colors"
+                    title="Download"
+                  >
+                    <UIcon name="i-heroicons-arrow-down-tray" class="w-5 h-5" />
+                  </button>
+                  <button
+                    @click="requestDeleteFile(f.id)"
+                    class="p-2 rounded-xl hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-colors"
+                    title="Delete"
+                  >
+                    <UIcon name="i-heroicons-trash" class="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             </div>
             <div v-else-if="!uploading" class="text-center py-12">
@@ -818,10 +907,10 @@ onMounted(() => fetchData())
                     <label class="text-xs font-semibold text-slate-400">Frequency</label>
                     <div class="relative w-full sm:w-48">
                       <select v-model="reminderConfig.frequency" class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 focus:outline-none appearance-none cursor-pointer">
-                        <option value="daily" class="bg-[#0d1525]">Daily</option>
-                        <option value="weekly" class="bg-[#0d1525]">Weekly</option>
-                        <option value="biweekly" class="bg-[#0d1525]">Every 2 Weeks</option>
-                        <option value="monthly" class="bg-[#0d1525]">Monthly</option>
+                        <option value="daily"     class="bg-[#0d1525]">Daily</option>
+                        <option value="weekly"    class="bg-[#0d1525]">Weekly</option>
+                        <option value="biweekly"  class="bg-[#0d1525]">Every 2 Weeks</option>
+                        <option value="monthly"   class="bg-[#0d1525]">Monthly</option>
                       </select>
                       <UIcon name="i-heroicons-chevron-up-down" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
                     </div>
@@ -836,7 +925,9 @@ onMounted(() => fetchData())
                       <UIcon v-else name="i-heroicons-envelope" class="w-4 h-4" />
                       {{ testEmailSending ? 'Sending...' : 'Send Test Email to Yourself' }}
                     </button>
-                    <p v-if="testEmailResult" class="text-xs mt-2" :class="testEmailResult === 'sent' ? 'text-emerald-400' : 'text-red-400'">{{ testEmailResult === 'sent' ? 'Test email sent! Check your inbox.' : 'Failed to send test email.' }}</p>
+                    <p v-if="testEmailResult" class="text-xs mt-2" :class="testEmailResult === 'sent' ? 'text-emerald-400' : 'text-red-400'">
+                      {{ testEmailResult === 'sent' ? 'Test email sent! Check your inbox.' : 'Failed to send test email.' }}
+                    </p>
                   </div>
                 </div>
                 <div class="pt-4 border-t border-white/5">
@@ -862,11 +953,14 @@ onMounted(() => fetchData())
                     <p class="text-xs text-slate-500">{{ new Date(log.sent_at).toLocaleString() }}</p>
                     <p v-if="log.error_message" class="text-xs text-red-400 mt-0.5">{{ log.error_message }}</p>
                   </div>
-                  <span :class="log.status === 'sent' ? 'text-emerald-400' : 'text-red-400'" class="text-xs font-semibold shrink-0 ml-4">{{ log.status === 'sent' ? 'Sent' : 'Failed' }}</span>
+                  <span :class="log.status === 'sent' ? 'text-emerald-400' : 'text-red-400'" class="text-xs font-semibold shrink-0 ml-4">
+                    {{ log.status === 'sent' ? 'Sent' : 'Failed' }}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
+
         </Transition>
       </div>
 
@@ -984,7 +1078,7 @@ onMounted(() => fetchData())
       </template>
     </ModalBase>
 
-    <!-- Delete Secret Confirmation Modal -->
+    <!-- Delete Secret Modal -->
     <ModalBase :open="showDeleteSecretConfirm" title="Delete Secret" subtitle="This action cannot be undone." @close="showDeleteSecretConfirm = false">
       <p class="text-slate-400 text-sm">Are you sure you want to delete this secret?</p>
       <template #footer>
@@ -995,7 +1089,21 @@ onMounted(() => fetchData())
       </template>
     </ModalBase>
 
-    <!-- Delete Project Confirmation Modal -->
+    <!-- Delete File Modal -->
+    <ModalBase :open="showDeleteFileConfirm" title="Delete File" subtitle="This action cannot be undone." @close="showDeleteFileConfirm = false">
+      <p class="text-slate-400 text-sm">This will permanently remove the file from storage.</p>
+      <template #footer>
+        <div class="flex gap-2.5">
+          <button @click="showDeleteFileConfirm = false" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all">Cancel</button>
+          <button @click="confirmDeleteFile" :disabled="isDeletingFile" class="flex-1 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-red-500/20 transition-all disabled:opacity-50">
+            <UIcon v-if="isDeletingFile" name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
+            <span v-else>Delete File</span>
+          </button>
+        </div>
+      </template>
+    </ModalBase>
+
+    <!-- Delete Project Modal -->
     <ModalBase :open="showDeleteProjectConfirm" title="Delete Project" subtitle="This action cannot be undone." @close="showDeleteProjectConfirm = false">
       <p class="text-slate-400 text-sm">Permanently removes the project along with all secrets, files, and events.</p>
       <template #footer>
@@ -1010,26 +1118,35 @@ onMounted(() => fetchData())
     </ModalBase>
 
     <!-- Toast -->
-    <Transition enter-active-class="transform ease-out duration-300 transition" enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2" enter-to-class="translate-y-0 opacity-100 sm:translate-x-0" leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
+    <Transition
+      enter-active-class="transform ease-out duration-300 transition"
+      enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
+      enter-to-class="translate-y-0 opacity-100 sm:translate-x-0"
+      leave-active-class="transition ease-in duration-100"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
       <div v-if="toast.show" class="fixed bottom-4 right-4 z-50">
-        <div class="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl border" :class="toast.type === 'success' ? 'bg-[#0d1525] border-emerald-500/50' : 'bg-[#0d1525] border-red-500/50'">
-          <UIcon :name="toast.type === 'success' ? 'i-heroicons-check-circle' : 'i-heroicons-exclamation-circle'" class="w-5 h-5" :class="toast.type === 'success' ? 'text-emerald-400' : 'text-red-400'" />
+        <div class="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl border"
+             :class="toast.type === 'success' ? 'bg-[#0d1525] border-emerald-500/50' : 'bg-[#0d1525] border-red-500/50'">
+          <UIcon
+            :name="toast.type === 'success' ? 'i-heroicons-check-circle' : 'i-heroicons-exclamation-circle'"
+            class="w-5 h-5"
+            :class="toast.type === 'success' ? 'text-emerald-400' : 'text-red-400'"
+          />
           <span class="font-semibold text-sm text-white">{{ toast.message }}</span>
         </div>
       </div>
     </Transition>
+
   </div>
 </template>
 
 <style scoped>
-.fade-enter-active,
-.fade-leave-active { transition: opacity 0.15s ease; }
-.fade-enter-from,
-.fade-leave-to { opacity: 0; }
-.tab-fade-enter-active,
-.tab-fade-leave-active { transition: opacity 0.2s ease; }
-.tab-fade-enter-from,
-.tab-fade-leave-to { opacity: 0; }
+.fade-enter-active, .fade-leave-active { transition: opacity 0.15s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+.tab-fade-enter-active, .tab-fade-leave-active { transition: opacity 0.2s ease; }
+.tab-fade-enter-from, .tab-fade-leave-to { opacity: 0; }
 textarea::-webkit-scrollbar { width: 8px; }
 textarea::-webkit-scrollbar-track { background: transparent; }
 textarea::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }

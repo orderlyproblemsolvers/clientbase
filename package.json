@@ -10,6 +10,8 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1073.0",
+    "@aws-sdk/s3-request-presigner": "^3.1073.0",
     "@nuxt/hints": "^1.0.0-alpha.5",
     "@nuxt/image": "^2.0.0",
     "@nuxt/ui": "^4.8.0",
@@ -18,8 +20,10 @@
     "@types/highlight.js": "^9.12.4",
     "@types/markdown-it": "^14.1.2",
     "highlight.js": "^11.11.1",
+    "html2pdf.js": "^0.14.0",
     "markdown-it": "^14.1.0",
     "nuxt": "^4.2.2",
+    "nuxt-seo-utils": "^8.3.1",
     "pinia": "^3.0.4",
     "tailwindcss": "^4.3.0",
     "typescript": "^5.9.3",

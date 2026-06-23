@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// ⚠️ Entire script remains exactly the same
 import { FIELD_TYPES, FILE_TYPE_OPTIONS, type FormField, type FieldType, useOnboarding } from '~/composables/useOnboarding'
 
 const supabase = useSupabaseClient()
@@ -9,7 +8,6 @@ const formId   = route.params.id as string
 
 const { blankField, moveUp, moveDown } = useOnboarding()
 
-// ── State ─────────────────────────────────────────────────────────────────────
 const loading   = ref(true)
 const saving    = ref(false)
 const formData  = ref<any>(null)
@@ -17,27 +15,27 @@ const fields    = ref<FormField[]>([])
 const activeTab = ref<'build' | 'fill' | 'share' | 'submissions'>('build')
 const toast     = ref({ show: false, message: '', type: 'success' })
 
-// Submissions
 const submissions = ref<any[]>([])
 const selectedSub = ref<any>(null)
 
-// Add field
 const showAddField   = ref(false)
 const editingField   = ref<FormField | null>(null)
 const editingFieldIdx = ref<number>(-1)
 
 const fieldDraft = ref<FormField>(blankField())
 
-// Fill mode
 const fillAnswers = ref<Record<string, any>>({})
 const submitting  = ref(false)
 const fillDone    = ref(false)
 
-// Clients / projects for linking
 const clients  = ref<any[]>([])
 const projects = ref<any[]>([])
 
-// ── Fetch ─────────────────────────────────────────────────────────────────────
+const draggedIndex = ref<number | null>(null)
+const draggedOverIndex = ref<number | null>(null)
+const touchDragIndex = ref<number | null>(null)
+const touchDragTarget = ref<number | null>(null)
+
 const fetchData = async () => {
   loading.value = true
   try {
@@ -64,7 +62,6 @@ const fetchData = async () => {
     const { data: pData } = await supabase.from('projects').select('id, name, client_id').order('name')
     projects.value = pData || []
 
-    // Pre-fill fill answers
     fields.value.forEach(f => { fillAnswers.value[f.id] = '' })
 
   } catch (e: any) {
@@ -74,7 +71,6 @@ const fetchData = async () => {
   }
 }
 
-// ── Save form ─────────────────────────────────────────────────────────────────
 const saveForm = async () => {
   saving.value = true
   try {
@@ -98,7 +94,6 @@ const saveForm = async () => {
   }
 }
 
-// ── Field CRUD ────────────────────────────────────────────────────────────────
 const openAddField = () => {
   fieldDraft.value  = blankField(fields.value.length)
   editingField.value = null
@@ -137,10 +132,93 @@ const removeField = (idx: number) => {
   fields.value = fields.value.map((f, i) => ({ ...f, position: i }))
 }
 
+// ── Drag and drop handlers ────────────────────────────────────────────────────
+const onDragStart = (event: DragEvent, index: number) => {
+  draggedIndex.value = index
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(index))
+  }
+}
+
+const onDragEnd = () => {
+  draggedIndex.value = null
+  draggedOverIndex.value = null
+}
+
+const onDragEnter = (event: DragEvent, index: number) => {
+  if (draggedIndex.value === null || draggedIndex.value === index) return
+  event.preventDefault()
+  draggedOverIndex.value = index
+}
+
+const onDragLeave = (event: DragEvent) => {
+  if (event.currentTarget === event.target) {
+    draggedOverIndex.value = null
+  }
+}
+
+const onDragOver = (event: DragEvent) => {
+  event.preventDefault()
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+}
+
+const onDrop = (event: DragEvent, dropIndex: number) => {
+  event.preventDefault()
+  if (draggedIndex.value === null || draggedIndex.value === dropIndex) return
+
+  const newFields = [...fields.value]
+  const [movedItem] = newFields.splice(draggedIndex.value, 1)
+  newFields.splice(dropIndex, 0, movedItem)
+  fields.value = newFields.map((f, i) => ({ ...f, position: i }))
+
+  draggedIndex.value = null
+  draggedOverIndex.value = null
+}
+
+// ── Touch drag and drop handlers (mobile) ─────────────────────────────────────
+const onTouchStart = (event: TouchEvent, index: number) => {
+  touchDragIndex.value = index
+  const target = event.currentTarget as HTMLElement
+  target.classList.add('touch-dragging')
+}
+
+const onTouchMove = (event: TouchEvent) => {
+  if (touchDragIndex.value === null) return
+  event.preventDefault()
+  const touch = event.touches[0]
+  const targetElement = document.elementFromPoint(touch.clientX, touch.clientY)
+  if (!targetElement) return
+
+  const fieldElement = (targetElement as HTMLElement).closest('[data-field-index]') as HTMLElement
+  if (!fieldElement) return
+
+  const targetIndex = Number(fieldElement.dataset.fieldIndex)
+  if (isNaN(targetIndex) || targetIndex === touchDragIndex.value) return
+
+  const newFields = [...fields.value]
+  const [movedItem] = newFields.splice(touchDragIndex.value, 1)
+  newFields.splice(targetIndex, 0, movedItem)
+  fields.value = newFields.map((f, i) => ({ ...f, position: i }))
+
+  touchDragIndex.value = targetIndex
+}
+
+const onTouchEnd = () => {
+  if (touchDragIndex.value !== null) {
+    const el = document.querySelector('.touch-dragging')
+    if (el) el.classList.remove('touch-dragging')
+  }
+  touchDragIndex.value = null
+  touchDragTarget.value = null
+}
+
+// ── Button-based reorder (fallback) ───────────────────────────────────────────
 const moveFieldUp   = (idx: number) => { fields.value = moveUp(fields.value, idx) }
 const moveFieldDown = (idx: number) => { fields.value = moveDown(fields.value, idx) }
 
-// Options for select field
 const optionInput = ref('')
 const addOption = () => {
   const o = optionInput.value.trim()
@@ -151,7 +229,6 @@ const addOption = () => {
 }
 const removeOption = (i: number) => fieldDraft.value.options.splice(i, 1)
 
-// ── Send to client (mark as sent) ─────────────────────────────────────────────
 const markSent = async () => {
   try {
     const { error } = await supabase
@@ -176,7 +253,6 @@ const clientLink = computed(() =>
   formData.value ? `${window.location.origin}/brief/${formData.value.token}` : ''
 )
 
-// ── Fill yourself ─────────────────────────────────────────────────────────────
 const submitFill = async () => {
   for (const f of fields.value) {
     if (f.required && !fillAnswers.value[f.id]) {
@@ -199,7 +275,6 @@ const submitFill = async () => {
     if (error) throw error
     await applyToRecord(fillAnswers.value, sub.id)
 
-    // Mark form completed
     await supabase.from('onboarding_forms')
       .update({ status: 'completed', updated_at: new Date().toISOString() })
       .eq('id', formId)
@@ -216,7 +291,6 @@ const submitFill = async () => {
   }
 }
 
-// ── Apply submission to client/project ────────────────────────────────────────
 const applyToRecord = async (responses: Record<string, any>, subId: string) => {
   const get = (labelFragment: string, type?: string): string => {
     const f = fields.value.find(f => {
@@ -316,7 +390,6 @@ const applySubmission = async (sub: any) => {
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 const showToast = (msg: string, type = 'success') => {
   toast.value = { show: true, message: msg, type }
   setTimeout(() => toast.value.show = false, 3000)
@@ -342,7 +415,6 @@ onMounted(() => fetchData())
 
 <template>
   <div class="min-h-screen bg-base font-sans">
-    <!-- Breadcrumb -->
     <nav class="flex items-center gap-1.5 text-sm text-slate-500 mb-8" aria-label="Breadcrumb">
       <NuxtLink to="/" class="flex items-center gap-1.5 hover:text-slate-300 transition-colors duration-150">
         <UIcon name="i-heroicons-squares-2x2" class="w-4 h-4" />
@@ -354,7 +426,6 @@ onMounted(() => fetchData())
       <span class="text-slate-300 truncate max-w-48">{{ formData?.title || '…' }}</span>
     </nav>
 
-    <!-- Loading -->
     <div v-if="loading" class="space-y-6">
       <div class="h-10 w-64 bg-white/5 animate-pulse rounded-lg"></div>
       <div class="h-96 bg-white/5 animate-pulse rounded-2xl"></div>
@@ -362,16 +433,12 @@ onMounted(() => fetchData())
 
     <div v-else-if="formData" class="space-y-8">
 
-      <!-- ===== Hero Header ===== -->
       <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/[0.04] via-white/[0.02] to-transparent border border-white/6 p-6 md:p-8">
         <div class="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none"></div>
         <div class="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div class="flex items-center gap-3">
             <h1 class="text-2xl font-bold text-white tracking-tight">{{ formData.title }}</h1>
-            <span
-              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border"
-              :class="statusConfig[formData.status]"
-            >
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border" :class="statusConfig[formData.status]">
               <span class="w-1.5 h-1.5 rounded-full" :class="{
                 'bg-slate-400': formData.status === 'draft',
                 'bg-blue-400': formData.status === 'sent',
@@ -395,7 +462,6 @@ onMounted(() => fetchData())
         </p>
       </div>
 
-      <!-- Tabs -->
       <div class="bg-white/5 p-1 rounded-xl flex gap-1 overflow-x-auto">
         <button
           v-for="tab in [
@@ -426,7 +492,6 @@ onMounted(() => fetchData())
 
       <!-- ── BUILD TAB ───────────────────────────────────────────────────── -->
       <div v-if="activeTab === 'build'" class="space-y-6">
-        <!-- Form Settings -->
         <div class="bg-white/[0.03] border border-white/6 rounded-2xl p-5 space-y-4">
           <h3 class="text-sm font-semibold text-white">Form Settings</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -489,8 +554,29 @@ onMounted(() => fetchData())
             <div
               v-for="(field, idx) in fields"
               :key="field.id"
-              class="flex items-center gap-4 px-5 py-3.5 hover:bg-white/[0.03] transition-colors duration-150 group"
+              :data-field-index="idx"
+              draggable="true"
+              @dragstart="onDragStart($event, idx)"
+              @dragend="onDragEnd"
+              @dragenter="onDragEnter($event, idx)"
+              @dragover="onDragOver($event)"
+              @dragleave="onDragLeave"
+              @drop="onDrop($event, idx)"
+              @touchstart.passive="onTouchStart($event, idx)"
+              @touchmove.prevent="onTouchMove"
+              @touchend="onTouchEnd"
+              class="flex items-center gap-4 px-5 py-3.5 hover:bg-white/[0.03] transition-colors duration-150 group cursor-grab active:cursor-grabbing"
+              :class="{
+                'opacity-50 border-2 border-dashed border-primary/30 bg-primary/5': draggedIndex === idx || touchDragIndex === idx,
+                'border-t-2 border-primary': (draggedOverIndex === idx && draggedIndex !== idx) || (touchDragTarget === idx && touchDragIndex !== idx),
+                'touch-dragging': touchDragIndex === idx,
+              }"
             >
+              <!-- Drag handle icon (visible on hover or always on touch devices) -->
+              <div class="flex items-center justify-center w-8 h-8 shrink-0 text-slate-600">
+                <UIcon name="i-heroicons-bars-3" class="w-5 h-5" />
+              </div>
+
               <div class="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
                 <UIcon :name="fieldTypeConfig(field.type).icon" class="w-4 h-4 text-slate-400" />
               </div>
@@ -705,176 +791,144 @@ onMounted(() => fetchData())
     </div>
 
     <!-- Add/Edit Field Modal -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div
-          v-if="showAddField"
-          class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="field-modal-title"
-        >
-          <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="showAddField = false" aria-hidden="true"></div>
-          <div class="relative w-full sm:max-w-md bg-[#0d1525] border border-white/8 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh]">
-            <div class="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
-              <div class="w-10 h-1 rounded-full bg-white/10"></div>
-            </div>
+    <ModalBase
+      :open="showAddField"
+      :title="editingField ? 'Edit Field' : 'Add Field'"
+      :subtitle="formData?.title"
+      @close="showAddField = false"
+    >
+      <div class="space-y-5">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-2">Field Type</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button
+              v-for="ft in FIELD_TYPES"
+              :key="ft.type"
+              type="button"
+              @click="fieldDraft.type = ft.type"
+              class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-lg border text-[10px] font-semibold uppercase tracking-wide transition-all"
+              :class="fieldDraft.type === ft.type
+                ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
+                : 'bg-white/5 text-slate-400 border-white/6 hover:border-white/10 hover:text-white'"
+            >
+              <UIcon :name="ft.icon" class="w-4 h-4" />
+              {{ ft.label }}
+            </button>
+          </div>
+        </div>
 
-            <div class="px-6 py-5 border-b border-white/5 flex items-center justify-between shrink-0">
-              <div>
-                <h2 id="field-modal-title" class="text-base font-bold text-white">{{ editingField ? 'Edit Field' : 'Add Field' }}</h2>
-                <p class="text-xs text-slate-500 mt-0.5">{{ formData?.title }}</p>
-              </div>
-              <button @click="showAddField = false" class="w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/8 transition-all" aria-label="Close modal">
-                <UIcon name="i-heroicons-x-mark" class="w-5 h-5" />
-              </button>
-            </div>
+        <div class="space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-400">Label <span class="text-red-400">*</span></label>
+          <input v-model="fieldDraft.label" type="text" placeholder="e.g. Budget, Company Name..." class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none" />
+        </div>
 
-            <div class="overflow-y-auto flex-1 px-6 py-5">
-              <div class="space-y-5">
-                <div>
-                  <label class="block text-xs font-semibold text-slate-400 mb-2">Field Type</label>
-                  <div class="grid grid-cols-3 gap-2">
-                    <button
-                      v-for="ft in FIELD_TYPES"
-                      :key="ft.type"
-                      type="button"
-                      @click="fieldDraft.type = ft.type"
-                      class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-lg border text-[10px] font-semibold uppercase tracking-wide transition-all"
-                      :class="fieldDraft.type === ft.type
-                        ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
-                        : 'bg-white/5 text-slate-400 border-white/6 hover:border-white/10 hover:text-white'"
-                    >
-                      <UIcon :name="ft.icon" class="w-4 h-4" />
-                      {{ ft.label }}
-                    </button>
-                  </div>
-                </div>
+        <div class="space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-400">Placeholder</label>
+          <input v-model="fieldDraft.placeholder" type="text" placeholder="Hint shown inside the field..." class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none" />
+        </div>
 
-                <div class="space-y-1.5">
-                  <label for="field-label" class="block text-xs font-semibold text-slate-400">Label <span class="text-red-400">*</span></label>
-                  <input id="field-label" v-model="fieldDraft.label" type="text" placeholder="e.g. Budget, Company Name..." class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
-                </div>
-
-                <div class="space-y-1.5">
-                  <label for="field-placeholder" class="block text-xs font-semibold text-slate-400">Placeholder</label>
-                  <input id="field-placeholder" v-model="fieldDraft.placeholder" type="text" placeholder="Hint shown inside the field..." class="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150" />
-                </div>
-
-                <div v-if="fieldDraft.type === 'select'" class="space-y-3">
-                  <label class="block text-xs font-semibold text-slate-400">Options</label>
-                  <div class="space-y-2">
-                    <div v-for="(opt, i) in fieldDraft.options" :key="i" class="flex items-center gap-2">
-                      <span class="flex-1 bg-white/[0.04] px-3 py-2 rounded-xl text-white text-sm">{{ opt }}</span>
-                      <button type="button" @click="removeOption(i)" class="p-1.5 rounded-lg text-slate-600 hover:text-red-400 transition-colors">
-                        <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                  <div class="flex gap-2">
-                    <input
-                      v-model="optionInput"
-                      type="text"
-                      placeholder="Add option..."
-                      class="flex-1 bg-white/[0.04] border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none transition-all duration-150"
-                      @keydown.enter.prevent="addOption"
-                    />
-                    <button type="button" @click="addOption" class="px-3 py-2.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/8 border border-white/6 text-slate-400 hover:text-white transition-all">
-                      Add
-                    </button>
-                  </div>
-                </div>
-
-                <div class="flex items-center gap-3">
-                  <button
-                    type="button"
-                    @click="fieldDraft.required = !fieldDraft.required"
-                    class="w-10 h-6 rounded-full relative transition-colors"
-                    :class="fieldDraft.required ? 'bg-primary' : 'bg-white/10'"
-                  >
-                    <div class="absolute top-1 w-4 h-4 rounded-full bg-white transition-all" :class="fieldDraft.required ? 'left-5' : 'left-1'"></div>
-                  </button>
-                  <label class="text-sm text-slate-400 font-medium cursor-pointer" @click="fieldDraft.required = !fieldDraft.required">
-                    Required field
-                  </label>
-                </div>
-
-                <div v-if="fieldDraft.type === 'file'" class="space-y-4 pt-2 border-t border-white/5">
-                  <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">File Field Settings</p>
-                  <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-1.5">
-                      Max number of files the client can upload
-                    </label>
-                    <div class="flex items-center gap-3">
-                      <button
-                        type="button"
-                        @click="fieldDraft.maxFiles = Math.max(1, (fieldDraft.maxFiles || 1) - 1)"
-                        class="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/8 text-white flex items-center justify-center font-semibold transition-colors"
-                      >−</button>
-                      <span class="text-white font-semibold w-8 text-center">{{ fieldDraft.maxFiles || 1 }}</span>
-                      <button
-                        type="button"
-                        @click="fieldDraft.maxFiles = Math.min(20, (fieldDraft.maxFiles || 1) + 1)"
-                        class="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/8 text-white flex items-center justify-center font-semibold transition-colors"
-                      >+</button>
-                      <span class="text-slate-500 text-xs">file{{ (fieldDraft.maxFiles || 1) !== 1 ? 's' : '' }} maximum</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-2">Accepted file types</label>
-                    <div class="grid grid-cols-2 gap-2">
-                      <label
-                        v-for="opt in FILE_TYPE_OPTIONS"
-                        :key="opt.value"
-                        class="flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all"
-                        :class="(fieldDraft.acceptedTypes || []).includes(opt.value)
-                          ? 'bg-primary/10 border-primary/30 text-white'
-                          : 'bg-white/5 border-white/6 text-slate-400 hover:border-white/10'"
-                      >
-                        <input
-                          type="checkbox"
-                          class="hidden"
-                          :checked="(fieldDraft.acceptedTypes || []).includes(opt.value)"
-                          @change="toggleAcceptedType(opt.value)"
-                        />
-                        <div
-                          class="w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all"
-                          :class="(fieldDraft.acceptedTypes || []).includes(opt.value)
-                            ? 'bg-primary border-primary'
-                            : 'border-slate-600'"
-                        >
-                          <UIcon v-if="(fieldDraft.acceptedTypes || []).includes(opt.value)" name="i-heroicons-check" class="w-2.5 h-2.5 text-white" />
-                        </div>
-                        <span class="text-xs font-medium">{{ opt.label }}</span>
-                      </label>
-                    </div>
-                    <p class="text-[10px] text-slate-600 mt-1">Leave all unchecked to allow any file type.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="px-6 py-4 border-t border-white/5 shrink-0 flex gap-2.5">
-              <button
-                type="button"
-                @click="showAddField = false"
-                class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all duration-150"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                @click="saveField"
-                :disabled="!fieldDraft.label.trim()"
-                class="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-primary/20 transition-all duration-150 active:scale-[0.98]"
-              >
-                {{ editingField ? 'Save Changes' : 'Add Field' }}
+        <div v-if="fieldDraft.type === 'select'" class="space-y-3">
+          <label class="block text-xs font-semibold text-slate-400">Options</label>
+          <div class="space-y-2">
+            <div v-for="(opt, i) in fieldDraft.options" :key="i" class="flex items-center gap-2">
+              <span class="flex-1 bg-white/[0.04] px-3 py-2 rounded-xl text-white text-sm">{{ opt }}</span>
+              <button type="button" @click="removeOption(i)" class="p-1.5 rounded-lg text-slate-600 hover:text-red-400 transition-colors">
+                <UIcon name="i-heroicons-x-mark" class="w-4 h-4" />
               </button>
             </div>
           </div>
+          <div class="flex gap-2">
+            <input
+              v-model="optionInput"
+              type="text"
+              placeholder="Add option..."
+              class="flex-1 bg-white/[0.04] border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/50 focus:outline-none"
+              @keydown.enter.prevent="addOption"
+            />
+            <button type="button" @click="addOption" class="px-3 py-2.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/8 border border-white/6 text-slate-400 hover:text-white transition-all">
+              Add
+            </button>
+          </div>
         </div>
-      </Transition>
-    </Teleport>
+
+        <div class="flex items-center gap-3">
+          <button
+            type="button"
+            @click="fieldDraft.required = !fieldDraft.required"
+            class="w-10 h-6 rounded-full relative transition-colors"
+            :class="fieldDraft.required ? 'bg-primary' : 'bg-white/10'"
+          >
+            <div class="absolute top-1 w-4 h-4 rounded-full bg-white transition-all" :class="fieldDraft.required ? 'left-5' : 'left-1'"></div>
+          </button>
+          <label class="text-sm text-slate-400 font-medium cursor-pointer" @click="fieldDraft.required = !fieldDraft.required">
+            Required field
+          </label>
+        </div>
+
+        <div v-if="fieldDraft.type === 'file'" class="space-y-4 pt-2 border-t border-white/5">
+          <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">File Field Settings</p>
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1.5">Max number of files the client can upload</label>
+            <div class="flex items-center gap-3">
+              <button
+                type="button"
+                @click="fieldDraft.maxFiles = Math.max(1, (fieldDraft.maxFiles || 1) - 1)"
+                class="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/8 text-white flex items-center justify-center font-semibold transition-colors"
+              >−</button>
+              <span class="text-white font-semibold w-8 text-center">{{ fieldDraft.maxFiles || 1 }}</span>
+              <button
+                type="button"
+                @click="fieldDraft.maxFiles = Math.min(20, (fieldDraft.maxFiles || 1) + 1)"
+                class="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/8 text-white flex items-center justify-center font-semibold transition-colors"
+              >+</button>
+              <span class="text-slate-500 text-xs">file{{ (fieldDraft.maxFiles || 1) !== 1 ? 's' : '' }} maximum</span>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-2">Accepted file types</label>
+            <div class="grid grid-cols-2 gap-2">
+              <label
+                v-for="opt in FILE_TYPE_OPTIONS"
+                :key="opt.value"
+                class="flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all"
+                :class="(fieldDraft.acceptedTypes || []).includes(opt.value)
+                  ? 'bg-primary/10 border-primary/30 text-white'
+                  : 'bg-white/5 border-white/6 text-slate-400 hover:border-white/10'"
+              >
+                <input
+                  type="checkbox"
+                  class="hidden"
+                  :checked="(fieldDraft.acceptedTypes || []).includes(opt.value)"
+                  @change="toggleAcceptedType(opt.value)"
+                />
+                <div
+                  class="w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all"
+                  :class="(fieldDraft.acceptedTypes || []).includes(opt.value)
+                    ? 'bg-primary border-primary'
+                    : 'border-slate-600'"
+                >
+                  <UIcon v-if="(fieldDraft.acceptedTypes || []).includes(opt.value)" name="i-heroicons-check" class="w-2.5 h-2.5 text-white" />
+                </div>
+                <span class="text-xs font-medium">{{ opt.label }}</span>
+              </label>
+            </div>
+            <p class="text-[10px] text-slate-600 mt-1">Leave all unchecked to allow any file type.</p>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex gap-2.5">
+          <button @click="showAddField = false" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/8 border border-white/6 transition-all">Cancel</button>
+          <button
+            @click="saveField"
+            :disabled="!fieldDraft.label.trim()"
+            class="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-primary/20 transition-all active:scale-[0.98]"
+          >
+            {{ editingField ? 'Save Changes' : 'Add Field' }}
+          </button>
+        </div>
+      </template>
+    </ModalBase>
 
     <!-- Toast -->
     <Transition enter-active-class="transform ease-out duration-300 transition" enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2" enter-to-class="translate-y-0 opacity-100 sm:translate-x-0" leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
@@ -909,5 +963,13 @@ onMounted(() => fetchData())
   .modal-enter-from .relative {
     transform: translateY(100%);
   }
+}
+
+.touch-dragging {
+  opacity: 0.6;
+  transform: scale(0.98);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 10;
+  background: rgba(255,255,255,0.05);
 }
 </style>

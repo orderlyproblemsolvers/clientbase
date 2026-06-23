@@ -13,8 +13,11 @@
 
       <div class="absolute bottom-12 left-12 right-12 max-w-md p-8 bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl">
         <div class="flex items-center gap-3 mb-4">
-          <div class="w-8 h-8 rounded bg-primary flex items-center justify-center font-bold text-white">C</div>
-          <h2 class="text-xl font-bold tracking-tight">ClientBase</h2>
+                 <img
+                  src="/img/clientbase-main-no-bg-white-light.svg"
+                  alt="Client Base OPS"
+                  class="h-6 w-auto object-contain"
+                />
         </div>
         <p class="text-gray-300 text-sm leading-relaxed">
           Secure client management, automated retainers, and code libraries for the modern consultancy.
